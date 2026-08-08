@@ -90,7 +90,7 @@ function DestinationPage() {
         <section className="mt-6">
           <h2 className="font-bold">الأنشطة المتاحة</h2>
           <ul className="mt-3 flex flex-wrap gap-2">
-            {d.activities.map((a) => (
+            {d.activities.map((a: string) => (
               <li key={a}>
                 <Chip>{a}</Chip>
               </li>
