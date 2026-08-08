@@ -4,6 +4,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@theme {
+  --font-sans:
+    "Tajawal", "Cairo", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Cairo", "Tajawal", ui-sans-serif, sans-serif;
+}
+
 /*
  * Design system definition.
  *
@@ -59,29 +65,47 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-sand: var(--sand);
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --shadow-soft: var(--shadow-soft);
+  --shadow-card: var(--shadow-card);
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --radius: 1rem;
+  --background: oklch(0.964 0.014 85);
+  --foreground: oklch(0.26 0.045 55);
+  --card: oklch(0.988 0.008 85);
+  --card-foreground: oklch(0.26 0.045 55);
+  --popover: oklch(0.988 0.008 85);
+  --popover-foreground: oklch(0.26 0.045 55);
+  --primary: oklch(0.36 0.07 52);
+  --primary-foreground: oklch(0.98 0.012 85);
+  --secondary: oklch(0.925 0.03 82);
+  --secondary-foreground: oklch(0.32 0.06 52);
+  --muted: oklch(0.935 0.022 84);
+  --muted-foreground: oklch(0.49 0.04 60);
+  --accent: oklch(0.79 0.13 78);
+  --accent-foreground: oklch(0.28 0.06 52);
+  --destructive: oklch(0.55 0.19 27);
+  --destructive-foreground: oklch(0.98 0.012 85);
+  --border: oklch(0.888 0.026 80);
+  --input: oklch(0.888 0.026 80);
+  --ring: oklch(0.72 0.12 78);
+  --sand: oklch(0.93 0.028 82);
+  --gold: oklch(0.79 0.13 78);
+  --gold-foreground: oklch(0.28 0.06 52);
+  --success: oklch(0.58 0.11 150);
+  --success-foreground: oklch(0.98 0.012 85);
+  --warning: oklch(0.72 0.15 65);
+  --warning-foreground: oklch(0.24 0.05 52);
+  --shadow-soft: 0 1px 2px oklch(0.36 0.07 52 / 0.06);
+  --shadow-card: 0 8px 24px -12px oklch(0.36 0.07 52 / 0.22);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -141,4 +165,22 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
+}
+
+/* Subtle Saudi geometric pattern (Najdi triangles) for decorative surfaces */
+@utility pattern-najdi {
+  background-image:
+    linear-gradient(135deg, var(--color-primary) 25%, transparent 25%),
+    linear-gradient(225deg, var(--color-primary) 25%, transparent 25%);
+  background-size: 22px 22px;
+  background-position: 0 0;
+  opacity: 0.05;
+}
+
+@utility pattern-band {
+  background-image: repeating-linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--color-gold) 45%, transparent) 0 2px,
+    transparent 2px 14px
+  );
 }
