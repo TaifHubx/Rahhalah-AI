@@ -40,7 +40,9 @@ export function useAppStore() {
     const listener = () => setSnapshot(appStore.get());
     listeners.add(listener);
     listener();
-    return () => listeners.delete(listener);
+    return () => {
+      listeners.delete(listener);
+    };
   }, []);
   return snapshot;
 }
