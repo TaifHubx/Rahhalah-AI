@@ -36,8 +36,14 @@ export function RahhalahAi() {
 
   async function handleFile(file?: File) {
     if (!file) return;
-    if (!file.type.startsWith("image/")) return toast.error(t("common.error"));
-    if (file.size > MAX_BYTES) return toast.error("حجم الصورة كبير جداً (الحد ٦ ميجابايت)");
+    if (!file.type.startsWith("image/")) {
+      toast.error(t("common.error"));
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      toast.error("حجم الصورة كبير جداً (الحد ٦ ميجابايت)");
+      return;
+    }
 
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
