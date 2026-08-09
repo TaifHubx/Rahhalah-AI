@@ -4,6 +4,10 @@ import jeddahImg from "@/assets/dest-jeddah.jpg";
 import abhaImg from "@/assets/dest-abha.jpg";
 import boulevardImg from "@/assets/dest-boulevard.jpg";
 import museumImg from "@/assets/dest-museum.jpg";
+import rijalImg from "@/assets/dest-rijal-almaa.jpg";
+import farasanImg from "@/assets/dest-farasan.jpg";
+import edgeImg from "@/assets/dest-edge.jpg";
+import taifImg from "@/assets/dest-taif.jpg";
 
 /**
  * Mock data layer.
@@ -133,6 +137,74 @@ export const destinations: Destination[] = [
     crowd: "منخفض",
     accessibilityNote: "مهيّأ بالكامل لأصحاب الهمم.",
     activities: ["قاعة الحضارات", "معرض الحج", "جولة مرشدة"],
+  },
+  {
+    id: "rijal-almaa",
+    name: "رجال ألمع",
+    city: "عسير",
+    category: "تراثي",
+    description: "قرية حجرية ملوّنة بأبراج مرتفعة على مدرجات جبال عسير.",
+    image: rijalImg,
+    rating: 4.7,
+    isOpen: true,
+    hours: "٨:٠٠ صباحاً – ٦:٠٠ مساءً",
+    familyFriendly: true,
+    accessible: false,
+    weather: "٢١° ضباب متقطع",
+    crowd: "منخفض",
+    accessibilityNote: "أدراج حجرية قديمة داخل القرية.",
+    activities: ["متحف القرية", "جولة الأبراج", "السوق الحجري"],
+  },
+  {
+    id: "farasan",
+    name: "جزر فرسان",
+    city: "جيزان",
+    category: "طبيعي",
+    description: "أرخبيل بمياه فيروزية وشعاب مرجانية وشواطئ بيضاء.",
+    image: farasanImg,
+    rating: 4.6,
+    isOpen: true,
+    hours: "مفتوح على مدار اليوم",
+    familyFriendly: true,
+    accessible: false,
+    weather: "٣١° بحري صافٍ",
+    crowd: "منخفض",
+    accessibilityNote: "الوصول عبر معدّية، ورمال غير ممهدة.",
+    activities: ["الغطس والسنوركل", "بيت الرفاعي", "رحلة قارب"],
+  },
+  {
+    id: "edge-of-the-world",
+    name: "حافة العالم",
+    city: "الرياض",
+    category: "طبيعي",
+    description: "منحدرات صحراوية شاسعة تطل على أفق مفتوح شمال غرب الرياض.",
+    image: edgeImg,
+    rating: 4.8,
+    isOpen: true,
+    hours: "أفضل وقت: قبل الغروب",
+    familyFriendly: false,
+    accessible: false,
+    weather: "٢٧° جاف",
+    crowd: "متوسط",
+    accessibilityNote: "طريق ترابي يحتاج سيارة دفع رباعي.",
+    activities: ["مشي على الحافة", "تصوير الغروب", "تخييم قصير"],
+  },
+  {
+    id: "taif-roses",
+    name: "الطائف ومزارع الورد",
+    city: "الطائف",
+    category: "طبيعي",
+    description: "مرتفعات معتدلة وحقول ورد طائفي ومدرجات زراعية.",
+    image: taifImg,
+    rating: 4.5,
+    isOpen: true,
+    hours: "٧:٠٠ صباحاً – ٥:٠٠ مساءً",
+    familyFriendly: true,
+    accessible: true,
+    weather: "٢٣° معتدل",
+    crowd: "متوسط",
+    accessibilityNote: "مسارات ترابية مستوية في معظم المزارع.",
+    activities: ["مصنع عطر الورد", "قطف الورد", "تلفريك الهدا"],
   },
 ];
 
