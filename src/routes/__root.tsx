@@ -13,6 +13,9 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Navbar } from "@/components/Navbar";
 import { Toaster } from "@/components/ui/sonner";
+import { RahhalahAi } from "@/components/RahhalahAi";
+import { I18nProvider } from "@/lib/i18n";
+import { AuthProvider } from "@/lib/auth";
 
 function NotFoundComponent() {
   return (
@@ -132,22 +135,27 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="flex min-h-screen flex-col">
-        <Navbar />
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <main className="flex-1">
-          <Outlet />
-        </main>
-        <footer className="border-t border-border/70 bg-card">
-          <div aria-hidden className="pattern-band h-1.5 w-full" />
-          <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted-foreground">
-            <p className="font-bold text-primary">رحّالة | Rahhalah</p>
-            <p className="mt-1">خطط بذكاء → تكيّف لحظياً → استكشف واستمتع</p>
-            <p className="mt-3 text-xs">نموذج أولي بواجهة تجريبية وبيانات تجريبية.</p>
+      <I18nProvider>
+        <AuthProvider>
+          <div className="flex min-h-screen flex-col">
+            <Navbar />
+            {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+            <main className="flex-1">
+              <Outlet />
+            </main>
+            <footer className="border-t border-border/70 bg-card">
+              <div aria-hidden className="pattern-band h-1.5 w-full" />
+              <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted-foreground">
+                <p className="font-bold text-primary">رحّالة | Rahhalah</p>
+                <p className="mt-1">خطط بذكاء → تكيّف لحظياً → استكشف واستمتع</p>
+                <p className="mt-3 text-xs">مدعوم بالذكاء الاصطناعي عبر Gemini.</p>
+              </div>
+            </footer>
           </div>
-        </footer>
-      </div>
-      <Toaster position="top-center" />
+          <RahhalahAi />
+          <Toaster position="top-center" />
+        </AuthProvider>
+      </I18nProvider>
     </QueryClientProvider>
   );
 }
