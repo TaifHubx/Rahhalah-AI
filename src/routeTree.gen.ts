@@ -10,8 +10,10 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ChallengesRouteImport } from './routes/challenges'
 import { Route as ExploreRouteImport } from './routes/explore'
+import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as PlanRouteImport } from './routes/plan'
 import { Route as RewardsRouteImport } from './routes/rewards'
 import { Route as TripRouteImport } from './routes/trip'
@@ -22,6 +24,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ChallengesRoute = ChallengesRouteImport.update({
   id: '/challenges',
   path: '/challenges',
@@ -30,6 +37,11 @@ const ChallengesRoute = ChallengesRouteImport.update({
 const ExploreRoute = ExploreRouteImport.update({
   id: '/explore',
   path: '/explore',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeaderboardRoute = LeaderboardRouteImport.update({
+  id: '/leaderboard',
+  path: '/leaderboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlanRoute = PlanRouteImport.update({
@@ -55,8 +67,10 @@ const DestinationIdRoute = DestinationIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/challenges': typeof ChallengesRoute
   '/explore': typeof ExploreRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/plan': typeof PlanRoute
   '/rewards': typeof RewardsRoute
   '/trip': typeof TripRoute
@@ -64,8 +78,10 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/challenges': typeof ChallengesRoute
   '/explore': typeof ExploreRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/plan': typeof PlanRoute
   '/rewards': typeof RewardsRoute
   '/trip': typeof TripRoute
@@ -74,8 +90,10 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/challenges': typeof ChallengesRoute
   '/explore': typeof ExploreRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/plan': typeof PlanRoute
   '/rewards': typeof RewardsRoute
   '/trip': typeof TripRoute
@@ -85,8 +103,10 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/auth'
     | '/challenges'
     | '/explore'
+    | '/leaderboard'
     | '/plan'
     | '/rewards'
     | '/trip'
@@ -94,8 +114,10 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/auth'
     | '/challenges'
     | '/explore'
+    | '/leaderboard'
     | '/plan'
     | '/rewards'
     | '/trip'
@@ -103,8 +125,10 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/auth'
     | '/challenges'
     | '/explore'
+    | '/leaderboard'
     | '/plan'
     | '/rewards'
     | '/trip'
@@ -113,8 +137,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRoute
   ChallengesRoute: typeof ChallengesRoute
   ExploreRoute: typeof ExploreRoute
+  LeaderboardRoute: typeof LeaderboardRoute
   PlanRoute: typeof PlanRoute
   RewardsRoute: typeof RewardsRoute
   TripRoute: typeof TripRoute
@@ -130,6 +156,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/challenges': {
       id: '/challenges'
       path: '/challenges'
@@ -142,6 +175,13 @@ declare module '@tanstack/react-router' {
       path: '/explore'
       fullPath: '/explore'
       preLoaderRoute: typeof ExploreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leaderboard': {
+      id: '/leaderboard'
+      path: '/leaderboard'
+      fullPath: '/leaderboard'
+      preLoaderRoute: typeof LeaderboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/plan': {
@@ -177,8 +217,10 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRoute: AuthRoute,
   ChallengesRoute: ChallengesRoute,
   ExploreRoute: ExploreRoute,
+  LeaderboardRoute: LeaderboardRoute,
   PlanRoute: PlanRoute,
   RewardsRoute: RewardsRoute,
   TripRoute: TripRoute,
@@ -187,3 +229,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
