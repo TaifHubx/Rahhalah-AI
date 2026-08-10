@@ -1,6 +1,9 @@
 import { callGemini, parseJsonOutput, runWithTools, type ChatMessage } from "./gateway.server";
-import { destinationCatalog } from "./destination-catalog";
+import { catalogEntry, destinationCatalog } from "./destination-catalog";
+import type { AdaptationResult, ItineraryStop, SmartItinerary } from "../trip-types";
 import { liveToolHandlers, liveTools } from "./live-tools.server";
+
+export type { AdaptationResult, ItineraryDay, ItineraryStop, SmartItinerary } from "../trip-types";
 
 /** المنطق الفعلي لميزات الذكاء الاصطناعي — يُستدعى من server functions فقط. */
 
@@ -102,29 +105,44 @@ export async function verifyChallengeImage(input: {
   };
 }
 
-export interface ItineraryStop {
-  time: string;
-  title: string;
-  destinationId: string;
-  place: string;
-  indoor: boolean;
-  weatherNote: string;
-  travel: string;
-  tip: string;
-}
+const ITINERARY_RULES =
+  `قواعد إلزامية:\n` +
+  `1) لا تخترع أي رقم واقعي. كل درجة حرارة/احتمال مطر يأتي من get_weather، وكل وقت صلاة من get_prayer_times، ` +
+  `وكل أوقات عمل أو "مفتوح الآن" أو مؤشر إقبال من get_place_status، وكل مسافة أو زمن تنقل من get_travel_time.\n` +
+  `2) نادِ get_weather و get_prayer_times أولاً، ثم get_place_status لكل وجهة تنويها، ثم get_travel_time بين كل محطة والتي تليها.\n` +
+  `3) لا تجدول نشاطاً خارجياً في ساعة احتمال المطر فيها ٥٠٪ أو أكثر أو حرارتها ٤٠° وأعلى — اختر بديلاً داخلياً.\n` +
+  `4) اترك فجوة ٢٥ دقيقة على الأقل حول أوقات الصلاة، ولا تبدأ محطة داخل وقت الصلاة.\n` +
+  `5) احترم أوقات العمل الحقيقية: لا تجدول زيارة خارج ساعات العمل الواردة من get_place_status.\n` +
+  `6) وقت الانتقال بين محطتين يجب أن يطابق travelMinutes من get_travel_time، وادخله في حساب توقيت المحطة التالية.\n` +
+  `7) إن طُلبت متطلبات وصول، فضّل الوجهات التي accessible=true.\n` +
+  `8) إن كان reviewCount مرتفعاً جداً (إقبال عالٍ) فاقترح ساعة أهدأ واذكر ذلك في crowdNote، وإلا اكتب crowdNote فارغاً.\n` +
+  `9) ٣-٥ محطات في اليوم.`;
 
-export interface ItineraryDay {
-  day: number;
-  title: string;
-  stops: ItineraryStop[];
-}
+const ITINERARY_SHAPE =
+  `أعد JSON فقط بالمفاتيح: city, summary, weatherSummary, prayerNote, dataSources (مصفوفة نصية بأسماء المصادر التي استخدمتها فعلاً), ` +
+  `days (مصفوفة: day رقم, title, stops مصفوفة من: time "HH:MM", title, destinationId, place, indoor boolean, weatherNote, ` +
+  `travel نص قصير, travelMinutes رقم, distanceKm رقم, openNow boolean أو null, accessible boolean, crowdNote, tip).`;
 
-export interface SmartItinerary {
-  city: string;
-  summary: string;
-  weatherSummary: string;
-  prayerNote: string;
-  days: ItineraryDay[];
+function normalizeStop(raw: Partial<ItineraryStop>): ItineraryStop {
+  const entry = catalogEntry(String(raw.destinationId ?? ""));
+  return {
+    time: raw.time ?? "",
+    title: raw.title ?? "",
+    destinationId: raw.destinationId ?? "",
+    place: raw.place ?? entry?.name ?? "",
+    indoor: Boolean(raw.indoor ?? entry?.indoor),
+    weatherNote: raw.weatherNote ?? "",
+    travel: raw.travel ?? "",
+    travelMinutes: Math.max(0, Math.round(Number(raw.travelMinutes) || 0)),
+    distanceKm: Math.max(0, Math.round((Number(raw.distanceKm) || 0) * 10) / 10),
+    openNow: typeof raw.openNow === "boolean" ? raw.openNow : null,
+    accessible: Boolean(raw.accessible ?? entry?.accessible),
+    crowdNote: raw.crowdNote ?? "",
+    tip: raw.tip ?? "",
+    // الإحداثيات تأتي من فهرس رحّالة، لا من الموديل.
+    lat: entry?.lat ?? 24.7136,
+    lng: entry?.lng ?? 46.6753,
+  };
 }
 
 export async function buildSmartItinerary(input: {
@@ -139,12 +157,8 @@ export async function buildSmartItinerary(input: {
     {
       role: "system",
       content:
-        `أنت مخطّط رحلات سعودية في تطبيق "رحّالة". استخدم الأدوات المتاحة لجلب الطقس الحقيقي وأوقات الصلاة قبل الجدولة، ` +
-        `ثم ابنِ برنامجاً واقعياً من هذه الوجهات فقط:\n${catalogText}\n` +
-        `قواعد: لا تجدول نشاطاً خارجياً في ساعة احتمال المطر فيها ٥٠٪ أو أكثر، اترك فجوة قصيرة قرب أوقات الصلاة، ` +
-        `راعِ متطلبات الوصول إن طُلبت، و٣-٥ محطات في اليوم. ` +
-        `في النهاية أعد JSON فقط بالمفاتيح: city, summary, weatherSummary, prayerNote, days ` +
-        `(مصفوفة: day رقم, title, stops مصفوفة من: time "HH:MM", title, destinationId, place, indoor boolean, weatherNote, travel, tip). ` +
+        `أنت مخطّط رحلات سعودية في تطبيق "رحّالة". استخدم الأدوات لجلب بيانات حقيقية قبل الجدولة، ` +
+        `وابنِ برنامجاً من هذه الوجهات فقط:\n${catalogText}\n${ITINERARY_RULES}\n${ITINERARY_SHAPE} ` +
         (input.lang === "en" ? "النصوص بالإنجليزية." : "النصوص بالعربية."),
     },
     {
@@ -155,41 +169,38 @@ export async function buildSmartItinerary(input: {
     },
   ];
 
-  const raw = await runWithTools(messages, liveTools, liveToolHandlers);
+  const raw = await runWithTools(messages, liveTools, liveToolHandlers, 8);
   const parsed = parseJsonOutput<SmartItinerary>(raw);
   return {
     city: parsed.city ?? input.city,
     summary: parsed.summary ?? "",
     weatherSummary: parsed.weatherSummary ?? "",
     prayerNote: parsed.prayerNote ?? "",
+    dataSources: Array.isArray(parsed.dataSources) ? parsed.dataSources.slice(0, 6) : [],
     days: (parsed.days ?? []).map((d, i) => ({
       day: Number(d.day) || i + 1,
       title: d.title ?? "",
-      stops: (d.stops ?? []).map((s) => ({ ...s, indoor: Boolean(s.indoor) })),
+      stops: (d.stops ?? []).map((s) => normalizeStop(s)),
     })),
   };
 }
 
-export interface AdaptationResult {
-  needsChange: boolean;
-  reason: string;
-  replacedStopTitle: string;
-  suggestion: { title: string; destinationId: string; place: string; time: string; why: string } | null;
-}
-
 export async function adaptItinerary(input: {
   city: string;
-  stops: { time: string; title: string; place: string; indoor: boolean }[];
+  stops: { time: string; title: string; place: string; destinationId: string; indoor: boolean }[];
   lang: "ar" | "en";
 }) {
   const messages: ChatMessage[] = [
     {
       role: "system",
       content:
-        `أنت مساعد تكيّف لحظي لرحلات "رحّالة". استخدم أداة الطقس لمدينة المستخدم، ثم قرّر إن كان أي نشاط خارجي معرّضاً للمطر ` +
-        `أو حرارة عالية جداً، واقترح بديلاً داخلياً قريباً من هذه القائمة فقط:\n${catalogText}\n` +
-        `أعد JSON فقط: needsChange (boolean), reason, replacedStopTitle, suggestion ` +
-        `(أو null) بالمفاتيح: title, destinationId, place, time, why. ` +
+        `أنت مساعد تكيّف لحظي لرحلات "رحّالة". استخدم get_weather لمدينة المستخدم و get_place_status للوجهات المرشحة ` +
+        `و get_travel_time للبديل، ثم قرّر إن كان أي نشاط خارجي معرّضاً للمطر أو حرارة عالية أو مغلقاً في وقته، ` +
+        `واقترح بديلاً واحداً من هذه القائمة فقط:\n${catalogText}\n` +
+        `لا تخترع أرقاماً: كل رقم من نتائج الأدوات. ` +
+        `أعد JSON فقط: needsChange (boolean), reason (سبب واضح مبني على البيانات), replacedStopTitle (عنوان المحطة المتأثرة حرفياً), ` +
+        `suggestion (أو null) بالمفاتيح: time "HH:MM", title, destinationId, place, indoor boolean, weatherNote, travel, ` +
+        `travelMinutes رقم, distanceKm رقم, openNow boolean أو null, accessible boolean, crowdNote, tip. ` +
         (input.lang === "en" ? "النصوص بالإنجليزية." : "النصوص بالعربية."),
     },
     {
@@ -197,18 +208,21 @@ export async function adaptItinerary(input: {
       content:
         `المدينة: ${input.city}\nالجدول الحالي:\n` +
         input.stops
-          .map((s) => `${s.time} - ${s.title} (${s.place}) ${s.indoor ? "داخلي" : "خارجي"}`)
+          .map(
+            (s) =>
+              `${s.time} - ${s.title} (${s.place})${s.destinationId ? ` [${s.destinationId}]` : ""} ${s.indoor ? "داخلي" : "خارجي"}`,
+          )
           .join("\n") +
         `\nهل يحتاج الجدول تعديلاً؟ أعد json`,
     },
   ];
 
-  const raw = await runWithTools(messages, liveTools, liveToolHandlers, 3);
+  const raw = await runWithTools(messages, liveTools, liveToolHandlers, 6);
   const parsed = parseJsonOutput<AdaptationResult>(raw);
   return {
     needsChange: Boolean(parsed.needsChange),
     reason: parsed.reason ?? "",
     replacedStopTitle: parsed.replacedStopTitle ?? "",
-    suggestion: parsed.suggestion ?? null,
+    suggestion: parsed.suggestion ? normalizeStop(parsed.suggestion) : null,
   };
 }
