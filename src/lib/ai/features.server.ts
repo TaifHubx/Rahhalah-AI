@@ -1,6 +1,9 @@
 import { callGemini, parseJsonOutput, runWithTools, type ChatMessage } from "./gateway.server";
 import { catalogEntry, destinationCatalog } from "./destination-catalog";
+import type { AdaptationResult, ItineraryStop, SmartItinerary } from "../trip-types";
 import { liveToolHandlers, liveTools } from "./live-tools.server";
+
+export type { AdaptationResult, ItineraryDay, ItineraryStop, SmartItinerary } from "../trip-types";
 
 /** المنطق الفعلي لميزات الذكاء الاصطناعي — يُستدعى من server functions فقط. */
 
@@ -102,39 +105,6 @@ export async function verifyChallengeImage(input: {
   };
 }
 
-export interface ItineraryStop {
-  time: string;
-  title: string;
-  destinationId: string;
-  place: string;
-  indoor: boolean;
-  weatherNote: string;
-  travel: string;
-  travelMinutes: number;
-  distanceKm: number;
-  openNow: boolean | null;
-  accessible: boolean;
-  crowdNote: string;
-  tip: string;
-  lat: number;
-  lng: number;
-}
-
-export interface ItineraryDay {
-  day: number;
-  title: string;
-  stops: ItineraryStop[];
-}
-
-export interface SmartItinerary {
-  city: string;
-  summary: string;
-  weatherSummary: string;
-  prayerNote: string;
-  dataSources: string[];
-  days: ItineraryDay[];
-}
-
 const ITINERARY_RULES =
   `قواعد إلزامية:\n` +
   `1) لا تخترع أي رقم واقعي. كل درجة حرارة/احتمال مطر يأتي من get_weather، وكل وقت صلاة من get_prayer_times، ` +
@@ -213,13 +183,6 @@ export async function buildSmartItinerary(input: {
       stops: (d.stops ?? []).map((s) => normalizeStop(s)),
     })),
   };
-}
-
-export interface AdaptationResult {
-  needsChange: boolean;
-  reason: string;
-  replacedStopTitle: string;
-  suggestion: ItineraryStop | null;
 }
 
 export async function adaptItinerary(input: {
