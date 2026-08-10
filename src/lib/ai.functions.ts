@@ -36,7 +36,6 @@ const adaptSchema = z.object({
         time: z.string().trim().max(10),
         title: z.string().trim().max(120),
         place: z.string().trim().max(120),
-        destinationId: z.string().trim().max(60).default(""),
         indoor: z.boolean(),
       }),
     )

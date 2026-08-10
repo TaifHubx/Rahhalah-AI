@@ -1,6 +1,5 @@
 import type { ToolDef } from "./gateway.server";
-import { catalogEntry, destinationCatalog } from "./destination-catalog";
-import { getPlaceStatus, getTravelTime } from "./maps.server";
+import { destinationCatalog } from "./destination-catalog";
 
 /**
  * أدوات "البيانات الحقيقية" التي يستدعيها Gemini عبر Function Calling.
@@ -74,21 +73,11 @@ export async function getPrayerTimes(args: Record<string, unknown>) {
   }
 }
 
-export function getDestinationInfo(args: Record<string, unknown>) {
+export function getOpeningHours(args: Record<string, unknown>) {
   const id = String(args["destinationId"] ?? "");
-  const entry = catalogEntry(id);
+  const entry = destinationCatalog.find((d) => d.id === id);
   if (!entry) return { destinationId: id, error: "وجهة غير معروفة" };
-  return {
-    destinationId: id,
-    name: entry.name,
-    region: entry.region,
-    traits: entry.traits,
-    declaredHours: entry.hours,
-    indoor: entry.indoor,
-    accessible: entry.accessible,
-    lat: entry.lat,
-    lng: entry.lng,
-  };
+  return { destinationId: id, name: entry.name, region: entry.region, traits: entry.traits };
 }
 
 export const liveTools: ToolDef[] = [
@@ -120,40 +109,11 @@ export const liveTools: ToolDef[] = [
     type: "function",
     function: {
       name: "get_destination_info",
-      description: "معلومات الوجهة: طبيعتها، إحداثياتها، إن كانت داخلية، ومدى ملاءمتها لأصحاب الهمم.",
+      description: "معلومات الوجهة وطبيعتها من فهرس رحّالة.",
       parameters: {
         type: "object",
         properties: { destinationId: { type: "string", description: "معرّف الوجهة" } },
         required: ["destinationId"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_place_status",
-      description:
-        "الحالة الحقيقية للمكان من Google Places: مفتوح الآن، أوقات العمل الأسبوعية، التقييم وعدد المقيّمين (مؤشر الإقبال).",
-      parameters: {
-        type: "object",
-        properties: { destinationId: { type: "string", description: "معرّف الوجهة" } },
-        required: ["destinationId"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_travel_time",
-      description:
-        "المسافة الحقيقية بالكيلومتر وزمن التنقل بالسيارة بالدقائق بين وجهتين، من Google Routes API.",
-      parameters: {
-        type: "object",
-        properties: {
-          fromDestinationId: { type: "string", description: "معرّف وجهة الانطلاق" },
-          toDestinationId: { type: "string", description: "معرّف وجهة الوصول" },
-        },
-        required: ["fromDestinationId", "toDestinationId"],
       },
     },
   },
@@ -162,7 +122,5 @@ export const liveTools: ToolDef[] = [
 export const liveToolHandlers = {
   get_weather: getWeather,
   get_prayer_times: getPrayerTimes,
-  get_destination_info: getDestinationInfo,
-  get_place_status: getPlaceStatus,
-  get_travel_time: getTravelTime,
+  get_destination_info: getOpeningHours,
 };
