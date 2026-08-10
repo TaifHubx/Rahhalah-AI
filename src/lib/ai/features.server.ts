@@ -187,7 +187,7 @@ export async function buildSmartItinerary(input: {
 
 export async function adaptItinerary(input: {
   city: string;
-  stops: { time: string; title: string; place: string; indoor: boolean }[];
+  stops: { time: string; title: string; place: string; destinationId: string; indoor: boolean }[];
   lang: "ar" | "en";
 }) {
   const messages: ChatMessage[] = [
@@ -208,7 +208,10 @@ export async function adaptItinerary(input: {
       content:
         `المدينة: ${input.city}\nالجدول الحالي:\n` +
         input.stops
-          .map((s) => `${s.time} - ${s.title} (${s.place}) ${s.indoor ? "داخلي" : "خارجي"}`)
+          .map(
+            (s) =>
+              `${s.time} - ${s.title} (${s.place})${s.destinationId ? ` [${s.destinationId}]` : ""} ${s.indoor ? "داخلي" : "خارجي"}`,
+          )
           .join("\n") +
         `\nهل يحتاج الجدول تعديلاً؟ أعد json`,
     },
