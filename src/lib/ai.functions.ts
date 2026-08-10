@@ -45,17 +45,17 @@ const adaptSchema = z.object({
 });
 
 export const discoverSimilarDestinations = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => discoverSchema.parse(input))
+  .validator((input: unknown) => discoverSchema.parse(input))
   .handler(async ({ data }) => discoverByImage(data.imageDataUrl, data.lang));
 
 export const verifyChallengePhoto = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => verifySchema.parse(input))
+  .validator((input: unknown) => verifySchema.parse(input))
   .handler(async ({ data }) => verifyChallengeImage(data));
 
 export const generateSmartItinerary = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => itinerarySchema.parse(input))
+  .validator((input: unknown) => itinerarySchema.parse(input))
   .handler(async ({ data }) => buildSmartItinerary(data));
 
 export const adaptItineraryToConditions = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => adaptSchema.parse(input))
+  .validator((input: unknown) => adaptSchema.parse(input))
   .handler(async ({ data }) => adaptItinerary(data));

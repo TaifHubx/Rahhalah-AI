@@ -56,7 +56,13 @@ function OptionButton({
   );
 }
 
-const steps = ["أين تريد الذهاب؟", "مع من تسافر؟", "ما نوع الأماكن التي تفضلها؟", "احتياجات الوصول", "مدة الرحلة"];
+const steps = [
+  "أين تريد الذهاب؟",
+  "مع من تسافر؟",
+  "ما نوع الأماكن التي تفضلها؟",
+  "احتياجات الوصول",
+  "مدة الرحلة",
+];
 
 function PlanPage() {
   const [step, setStep] = useState(0);
@@ -84,10 +90,7 @@ function PlanPage() {
           {steps.map((_, i) => (
             <span
               key={i}
-              className={cn(
-                "h-1.5 flex-1 rounded-full",
-                i <= step ? "bg-gold" : "bg-border",
-              )}
+              className={cn("h-1.5 flex-1 rounded-full", i <= step ? "bg-gold" : "bg-border")}
             />
           ))}
         </div>
@@ -128,9 +131,7 @@ function PlanPage() {
                 onClick={() =>
                   setAnswers((a) => ({
                     ...a,
-                    types: a.types.includes(t)
-                      ? a.types.filter((x) => x !== t)
-                      : [...a.types, t],
+                    types: a.types.includes(t) ? a.types.filter((x) => x !== t) : [...a.types, t],
                   }))
                 }
               >
@@ -191,7 +192,18 @@ function PlanPage() {
             </Button>
           ) : (
             <Button asChild variant="gold" size="lg">
-              <Link to="/trip">أنشئ رحلتي ✨</Link>
+              <Link
+                to="/trip"
+                search={{
+                  city: answers.city,
+                  companion: answers.companion,
+                  types: answers.types,
+                  access: answers.access,
+                  days: answers.days,
+                }}
+              >
+                أنشئ رحلتي ✨
+              </Link>
             </Button>
           )}
           <Button asChild variant="ghost">

@@ -212,26 +212,6 @@ export function getDestination(id: string) {
   return destinations.find((d) => d.id === id);
 }
 
-export interface TimelineItem {
-  id: string;
-  time: string;
-  title: string;
-  place: string;
-  weather: string;
-  booking: "مؤكد" | "بدون حجز" | "قيد الانتظار";
-  travel: string;
-  status: "منجز" | "قادم" | "جارٍ";
-  indoor: boolean;
-}
-
-export const todayItinerary: TimelineItem[] = [
-  { id: "t1", time: "09:00", title: "إفطار", place: "مقهى البجيري", weather: "٢٤° مشمس", booking: "بدون حجز", travel: "٥ دقائق مشياً", status: "منجز", indoor: true },
-  { id: "t2", time: "10:30", title: "زيارة الدرعية", place: "حي الطريف", weather: "٢٨° مشمس", booking: "مؤكد", travel: "١٢ دقيقة بالسيارة", status: "جارٍ", indoor: false },
-  { id: "t3", time: "13:00", title: "مطعم نجدي", place: "الدرعية", weather: "٣٠° مشمس", booking: "مؤكد", travel: "٧ دقائق مشياً", status: "قادم", indoor: true },
-  { id: "t4", time: "16:00", title: "ممشى خارجي", place: "وادي حنيفة", weather: "أمطار متوقعة", booking: "بدون حجز", travel: "١٥ دقيقة بالسيارة", status: "قادم", indoor: false },
-  { id: "t5", time: "19:00", title: "بوليفارد سيتي", place: "الرياض", weather: "٢٦° لطيف", booking: "قيد الانتظار", travel: "٢٠ دقيقة بالسيارة", status: "قادم", indoor: false },
-];
-
 export interface Challenge {
   id: string;
   destinationId: string;
