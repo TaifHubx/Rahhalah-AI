@@ -1,12 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import { Camera, Loader2, Upload } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { Camera, CheckCircle2, Loader2, RefreshCw, Upload, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { PageHeader } from "@/components/PageHeader";
 import { Chip } from "@/components/StatusChips";
 import { challenges, getDestination } from "@/lib/mock-data";
-import { appStore, useAppStore } from "@/lib/app-store";
+import { verifyChallengePhoto } from "@/lib/ai.functions";
+import { useProgress } from "@/lib/progress";
 
 export const Route = createFileRoute("/challenges")({
   head: () => ({
@@ -23,10 +25,33 @@ export const Route = createFileRoute("/challenges")({
   component: ChallengesPage,
 });
 
-type Phase = "idle" | "verifying" | "done";
+type Phase = "idle" | "verifying" | "success" | "failed" | "error";
 
-function ChallengeCard({ id, title, task, points, place }: {
+interface Result {
+  confidence: number;
+  detected: string;
+  feedback: string;
+}
+
+function readFile(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("تعذّر قراءة الصورة"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function ChallengeCard({
+  id,
+  destinationId,
+  title,
+  task,
+  points,
+  place,
+}: {
   id: string;
+  destinationId: string;
   title: string;
   task: string;
   points: number;
@@ -34,18 +59,42 @@ function ChallengeCard({ id, title, task, points, place }: {
 }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [preview, setPreview] = useState<string | null>(null);
+  const [result, setResult] = useState<Result | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const { completedChallenges } = useAppStore();
+
+  const verify = useServerFn(verifyChallengePhoto);
+  const { completedChallenges, completeChallenge } = useProgress();
   const completed = completedChallenges.includes(id);
 
-  function handleFile(file?: File) {
-    if (file) setPreview(URL.createObjectURL(file));
+  async function handleFile(file?: File) {
+    if (!file) return;
+    setResult(null);
+    setErrorMessage("");
     setPhase("verifying");
-    // محاكاة تحقق الذكاء الاصطناعي — يُستبدل لاحقاً بنداء Gemini
-    setTimeout(() => {
-      appStore.completeChallenge(id, points);
-      setPhase("done");
-    }, 2200);
+    try {
+      const imageDataUrl = await readFile(file);
+      setPreview(imageDataUrl);
+      const res = await verify({
+        data: { imageDataUrl, task, destinationName: place, lang: "ar" },
+      });
+      setResult({ confidence: res.confidence, detected: res.detected, feedback: res.feedback });
+      if (res.verified) {
+        await completeChallenge({ challengeId: id, destinationId, points });
+        setPhase("success");
+      } else {
+        setPhase("failed");
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "تعذّر التحقق من الصورة");
+      setPhase("error");
+    }
+  }
+
+  function reset() {
+    setPhase("idle");
+    setResult(null);
+    setErrorMessage("");
   }
 
   return (
@@ -70,24 +119,52 @@ function ChallengeCard({ id, title, task, points, place }: {
       )}
 
       <div className="mt-4" aria-live="polite">
-        {completed || phase === "done" ? (
-          <div className="rounded-xl border border-success/40 bg-success/12 p-3 text-sm font-medium text-success">
-            🎉 أحسنت! تم التحقق من الصورة — +{points} نقطة
+        {completed || phase === "success" ? (
+          <div className="rounded-xl border border-success/40 bg-success/12 p-3 text-sm text-success">
+            <p className="flex items-center gap-2 font-medium">
+              <CheckCircle2 className="size-4 shrink-0" aria-hidden />
+              🎉 أحسنت! تم التحقق من الصورة — +{points} نقطة
+            </p>
+            {result && (
+              <p className="mt-2 text-xs leading-relaxed">
+                {result.feedback || result.detected} • درجة الثقة {result.confidence}%
+              </p>
+            )}
           </div>
         ) : phase === "verifying" ? (
           <div className="flex items-center gap-2 rounded-xl bg-secondary p-3 text-sm text-secondary-foreground">
             <Loader2 className="size-4 animate-spin" aria-hidden />
             جاري التحقق من الصورة بالذكاء الاصطناعي...
           </div>
+        ) : phase === "failed" ? (
+          <div className="rounded-xl border border-warning/50 bg-warning/12 p-3 text-sm text-warning-foreground">
+            <p className="flex items-center gap-2 font-medium">
+              <XCircle className="size-4 shrink-0" aria-hidden />
+              لم نتمكن من قبول الصورة
+            </p>
+            <p className="mt-2 text-xs leading-relaxed">
+              {result?.feedback || "الصورة لا تحقق شرط التحدي."}
+              {result?.detected ? ` (ما رأيناه: ${result.detected})` : ""}
+            </p>
+            <Button className="mt-3" size="sm" variant="outline" onClick={reset}>
+              <RefreshCw className="size-3.5" aria-hidden />
+              حاول مرة أخرى
+            </Button>
+          </div>
+        ) : phase === "error" ? (
+          <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            <p className="font-medium">تعذّر إكمال التحقق</p>
+            <p className="mt-1 text-xs leading-relaxed">{errorMessage}</p>
+            <Button className="mt-3" size="sm" variant="outline" onClick={reset}>
+              <RefreshCw className="size-3.5" aria-hidden />
+              إعادة المحاولة
+            </Button>
+          </div>
         ) : (
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => inputRef.current?.click()}>
               <Camera className="size-4" aria-hidden />
               ابدأ التحدي
-            </Button>
-            <Button variant="outline" onClick={() => handleFile()}>
-              <Upload className="size-4" aria-hidden />
-              رفع صورة تجريبية
             </Button>
             <input
               ref={inputRef}
@@ -96,8 +173,12 @@ function ChallengeCard({ id, title, task, points, place }: {
               capture="environment"
               className="sr-only"
               aria-label={`ارفع صورة لتحدي ${title}`}
-              onChange={(e) => handleFile(e.target.files?.[0])}
+              onChange={(e) => void handleFile(e.target.files?.[0])}
             />
+            <Button variant="outline" onClick={() => inputRef.current?.click()}>
+              <Upload className="size-4" aria-hidden />
+              رفع صورة من الجهاز
+            </Button>
           </div>
         )}
       </div>
@@ -106,7 +187,7 @@ function ChallengeCard({ id, title, task, points, place }: {
 }
 
 function ChallengesPage() {
-  const { points } = useAppStore();
+  const { points, loading, completedChallenges } = useProgress();
   const nextTier = 500;
 
   return (
@@ -121,7 +202,7 @@ function ChallengesPage() {
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
             <h2 className="min-w-0 truncate font-bold">تقدّم نقاطك</h2>
             <span className="shrink-0 text-sm font-bold text-primary">
-              {points} / {nextTier}
+              {loading ? "..." : `${points} / ${nextTier}`}
             </span>
           </div>
           <Progress
@@ -130,7 +211,8 @@ function ChallengesPage() {
             aria-label="التقدم نحو المستوى التالي"
           />
           <p className="mt-2 text-xs text-muted-foreground">
-            تبقّى {Math.max(0, nextTier - points)} نقطة للوصول إلى مستوى «رحّال ذهبي».
+            تبقّى {Math.max(0, nextTier - points)} نقطة للوصول إلى مستوى «رحّال ذهبي» • أنجزت{" "}
+            {completedChallenges.length} تحديات.
           </p>
         </section>
 
@@ -139,6 +221,7 @@ function ChallengesPage() {
             <ChallengeCard
               key={c.id}
               id={c.id}
+              destinationId={c.destinationId}
               title={c.title}
               task={c.task}
               points={c.points}

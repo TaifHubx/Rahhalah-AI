@@ -184,3 +184,13 @@
     transparent 2px 14px
   );
 }
+
+/* رسم مسار الرحلة تدريجياً على الخريطة التفاعلية */
+@keyframes journey-draw {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
