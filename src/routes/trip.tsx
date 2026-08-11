@@ -42,10 +42,6 @@ export const Route = createFileRoute("/trip")({
     companion: typeof search["companion"] === "string" ? search["companion"] : undefined,
     types: Array.isArray(search["types"]) ? search["types"].map(String) : [],
     access: typeof search["access"] === "string" ? search["access"] : undefined,
-    days:
-      typeof search["days"] === "number" && search["days"] > 0
-        ? Math.round(search["days"])
-        : undefined,
   }),
   head: () => ({
     meta: [
@@ -73,7 +69,6 @@ function TripPage() {
   const companion = search.companion || "فردي";
   const types = search.types;
   const access = search.access || "بدون متطلبات خاصة";
-  const days = search.days || 1;
   const hasPreferences = Boolean(city);
 
   const [items, setItems] = useState<AiItineraryStop[]>([]);
@@ -87,7 +82,7 @@ function TripPage() {
   // توليد حي للخطة عبر Gemini AI استناداً إلى تفضيلات المستخدم الحقيقية من نموذج /plan —
   // بلا أي خطة افتراضية ثابتة. لا يُطلَق شيء قبل توفر مدينة فعلية من الاستعلام.
   const fetchItinerary = useServerFn(generateSmartItinerary);
-  const itineraryKey = `${city ?? ""}|${companion}|${types.join(",")}|${access}|${days}`;
+  const itineraryKey = `${city ?? ""}|${companion}|${types.join(",")}|${access}`;
   const itinerary = useQuery({
     queryKey: ["itinerary", itineraryKey],
     queryFn: () =>
@@ -97,13 +92,14 @@ function TripPage() {
           companions: companion,
           interests: types,
           accessNeeds: access,
-          days,
           lang: "ar",
         },
       }),
     enabled: hasPreferences,
     staleTime: Infinity,
-    retry: 1,
+    // بلا إعادة محاولة تلقائية: عند 429 (تجاوز حد التوكينات بالدقيقة) تُعيد المحاولة فوراً
+    // استهلاك المزيد من نفس النافذة الزمنية المستنفَدة أصلاً، فتُبقي الخطأ بدل حلّه.
+    retry: 0,
   });
 
   // نُحمّل محطات اليوم الأول من الخطة المولَّدة إلى حالة محلية قابلة للتعديل (لاستيعاب قبول
@@ -112,7 +108,7 @@ function TripPage() {
   useEffect(() => {
     if (!itinerary.data || loadedItineraryKeyRef.current === itineraryKey) return;
     loadedItineraryKeyRef.current = itineraryKey;
-    setItems(itinerary.data.days[0]?.stops ?? []);
+    setItems(itinerary.data.stops ?? []);
     setAlertState("open");
     setGeocodedById({});
   }, [itinerary.data, itineraryKey]);
@@ -152,7 +148,8 @@ function TripPage() {
       }),
     enabled: Boolean(resolvedCity) && items.length > 0,
     staleTime: 10 * 60 * 1000,
-    retry: 1,
+    // نفس منطق itinerary أعلاه: تجنّب إعادة محاولة فورية تستهلك من نفس نافذة TPM المستنفَدة.
+    retry: 0,
   });
 
   const baseStops = useMemo(() => buildJourneyFromItinerary(items), [items]);
@@ -168,7 +165,11 @@ function TripPage() {
       if (geocodedById[key] || pendingGeocodeRef.current.has(key)) return;
       pendingGeocodeRef.current.add(key);
 
-      void resolvePlaceCoords(placeId ? { query, placeId } : { query }).then((result) => {
+      void resolvePlaceCoords({
+        query,
+        ...(placeId ? { placeId } : {}),
+        ...(resolvedCity ? { city: resolvedCity } : {}),
+      }).then((result) => {
         pendingGeocodeRef.current.delete(key);
         if (cancelled || !result) return;
         setGeocodedById((prev) => (prev[key] ? prev : { ...prev, [key]: result }));
@@ -177,7 +178,7 @@ function TripPage() {
     return () => {
       cancelled = true;
     };
-  }, [baseStops, geocodedById]);
+  }, [baseStops, geocodedById, resolvedCity]);
 
   const stops = useMemo(() => {
     const withCoords = withComputedDistances(withGeocodedCoords(baseStops, geocodedById));
@@ -215,6 +216,8 @@ function TripPage() {
               title: suggestion.title,
               destinationId: suggestion.destinationId,
               place: suggestion.place,
+              placeQuery: suggestion.placeQuery || suggestion.place,
+              locationContext: suggestion.locationContext || "",
               time: newTime,
               indoor: true,
               weatherNote: "نشاط داخلي مكيّف — بديل ذكي حسب الطقس",
@@ -252,7 +255,6 @@ function TripPage() {
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <CalendarDays className="size-4 shrink-0" aria-hidden />
             {resolvedCity || city} • {weekdayFormatter.format(new Date())} • {items.length} أنشطة
-            {days > 1 && ` • اليوم الأول من ${days} أيام`}
           </p>
         </div>
         <Button asChild variant="outline" className="shrink-0">

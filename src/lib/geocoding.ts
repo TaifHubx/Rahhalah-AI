@@ -12,33 +12,45 @@ export interface GeocodeResult {
   placeId: string;
 }
 
-// كاش بالذاكرة حسب نص الاستعلام — يمنع تكرار نفس نداء Places عند كل إعادة رسم
-// (مثلاً عند وصول بيانات طقس جديدة لا تغيّر تسلسل المحطات).
+// كاش بالذاكرة حسب نص الاستعلام + مركز الانحياز — يمنع تكرار نفس نداء Places عند كل
+// إعادة رسم (مثلاً عند وصول بيانات طقس جديدة لا تغيّر تسلسل المحطات). مدمج بمدينة الانحياز
+// كي لا يُعاد استخدام نتيجة رحلة مدينة أخرى لنص استعلام قد يتشابه صدفة.
 const cache = new Map<string, GeocodeResult | null>();
 
-// انحياز جغرافي نحو الرياض الكبرى لتحسين دقة نتائج البحث النصي الغامضة — دائرة نصف قطرها
-// ٤٠ كم بدل نقطة واحدة، لأن locationBias كنقطة LatLng مجرّدة انحياز ضعيف جداً في الترتيب
-// (وهو ما تسبّب سابقاً بنتائج مثل ظهور "بوليفارد" في مكان مختلف عن حطين الفعلية).
-const SEARCH_BIAS: google.maps.CircleLiteral = {
-  center: { lat: 24.7136, lng: 46.6753 },
-  radius: 40_000,
+// مراكز تقريبية لمدن رحّالة الستة (نفس المدن المعروضة في معالج /plan) — تُستخدم لبناء دائرة
+// انحياز جغرافي (locationBias) صحيحة لمدينة الرحلة الفعلية بدل انحياز ثابت نحو الرياض دائماً
+// (كان هذا يُضعف دقة النتائج الغامضة لأي مدينة غير الرياض).
+const CITY_CENTERS: Record<string, google.maps.LatLngLiteral> = {
+  الرياض: { lat: 24.7136, lng: 46.6753 },
+  جدة: { lat: 21.4858, lng: 39.1925 },
+  العلا: { lat: 26.6089, lng: 37.9216 },
+  أبها: { lat: 18.2164, lng: 42.5053 },
+  الدمام: { lat: 26.4207, lng: 50.0888 },
+  "المدينة المنورة": { lat: 24.5247, lng: 39.5692 },
 };
 
-export async function geocodePlace(query: string): Promise<GeocodeResult | null> {
-  const key = query.trim();
-  if (!key) return null;
+function biasFor(city: string | undefined): google.maps.CircleLiteral {
+  const center = (city && CITY_CENTERS[city.trim()]) || CITY_CENTERS["الرياض"]!;
+  // دائرة نصف قطرها ٤٠ كم بدل نقطة واحدة، لأن locationBias كنقطة LatLng مجرّدة انحياز
+  // ضعيف جداً في الترتيب (وهو ما تسبّب سابقاً بنتائج مثل ظهور "بوليفارد" في مكان مختلف
+  // عن حطين الفعلية).
+  return { center, radius: 40_000 };
+}
+
+export async function geocodePlace(query: string, city?: string): Promise<GeocodeResult | null> {
+  const key = `${city ?? ""}|${query.trim()}`;
+  if (!query.trim()) return null;
   if (cache.has(key)) return cache.get(key) ?? null;
 
   try {
     const places = await loadGoogleMapsLibrary("places");
     // ملاحظة: componentRestrictions لا وجود له في SearchByTextRequest (هو حقل من
     // Geocoding API/Autocomplete القديمة). المكافئ هنا locationBias (انحياز ناعم فقط،
-    // كما أعلاه) أو locationRestriction لفرض حدود جغرافية صارمة إن احتجنا ذلك لاحقاً؛
-    // لم نستخدمه لأن destinations تشمل مدناً غير الرياض (جدة/العلا/أبها...).
+    // كما أعلاه) أو locationRestriction لفرض حدود جغرافية صارمة إن احتجنا ذلك لاحقاً.
     const { places: results } = await places.Place.searchByText({
-      textQuery: key,
+      textQuery: query.trim(),
       fields: ["location", "id"],
-      locationBias: SEARCH_BIAS,
+      locationBias: biasFor(city),
       language: "ar",
       region: "sa",
       maxResultCount: 1,
@@ -94,10 +106,11 @@ export async function geocodeByPlaceId(placeId: string): Promise<GeocodeResult |
 export async function resolvePlaceCoords(params: {
   query: string;
   placeId?: string;
+  city?: string;
 }): Promise<GeocodeResult | null> {
   if (params.placeId) {
     const byId = await geocodeByPlaceId(params.placeId);
     if (byId) return byId;
   }
-  return geocodePlace(params.query);
+  return geocodePlace(params.query, params.city);
 }

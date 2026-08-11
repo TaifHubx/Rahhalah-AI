@@ -25,7 +25,6 @@ const itinerarySchema = z.object({
   companions: z.string().trim().max(80).default("فردي"),
   interests: z.array(z.string().trim().max(60)).max(8).default([]),
   accessNeeds: z.string().trim().max(120).default("بدون متطلبات خاصة"),
-  days: z.number().int().min(1).max(7),
   lang: langSchema,
 });
 const adaptSchema = z.object({

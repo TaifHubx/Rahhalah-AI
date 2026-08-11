@@ -56,7 +56,9 @@ export function RahhalahAi() {
     setResult(null);
     setBusy(true);
     try {
-      const data = await discoverSimilarDestinations({ data: { imageDataUrl: dataUrl, lang: "ar" } });
+      const data = await discoverSimilarDestinations({
+        data: { imageDataUrl: dataUrl, lang: "ar" },
+      });
       setResult(data);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("common.error"));

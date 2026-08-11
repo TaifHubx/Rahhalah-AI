@@ -1,18 +1,21 @@
 /**
- * طبقة اتصال واحدة ومباشرة مع Google Gemini API — بلا أي بوابة وسيطة خارجية.
- * الواجهة العامة (ChatMessage/ToolDef بأسلوب OpenAI) تبقى كما هي كي لا يحتاج أي كود
- * مستهلك (features.server.ts) لأي تعديل؛ التحويل لبنية Gemini الأصلية (contents/parts)
- * يحدث داخلياً هنا فقط. المفتاح يُقرأ من بيئة السيرفر (GEMINI_API_KEY) ولا يظهر أبداً
- * في الواجهة، ولا يُكتب نصياً في أي ملف كود.
+ * طبقة اتصال واحدة ومباشرة مع OpenAI API — بروتوكول قياسي مستقر (نفس شكل
+ * ChatMessage/ToolDef/الرد هنا تماماً)، فلا حاجة لأي طبقة تحويل بنية. المفتاح يُقرأ من
+ * بيئة السيرفر (OPENAI_API_KEY) ولا يظهر أبداً في الواجهة، ولا يُكتب نصياً في أي ملف كود.
+ *
+ * اسم الدالة العامة callGemini بقي كما هو (رغم أن المزوّد الفعلي الآن OpenAI) كي لا يحتاج
+ * src/lib/ai/features.server.ts لأي تعديل في استيراداته.
  */
 
-export const GEMINI_MODEL = "gemini-1.5-flash"; // حصة مجانية أوسع من gemini-2.0-flash — بديل عند 429/RESOURCE_EXHAUSTED
-export const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
+// gpt-4o-mini: سريع ورخيص وموثوق، بحدود معدّل مرتفعة جداً حتى على أدنى مستوى فوترة مدفوع —
+// لا حاجة لموديل أكبر لمهامنا (توليد رحلة JSON بنيوية + استدعاء أدوات بسيط).
+export const OPENAI_MODEL = "gpt-4o-mini";
 
 // تأكيد لمرة واحدة عند تحميل هذا الملف في عملية السيرفر (أول استدعاء AI يُحمّله) —
-// يساعد على التحقق سريعاً من أن GEMINI_API_KEY مقروء فعلاً من .env دون كشف قيمته.
-if (process.env["GEMINI_API_KEY"]) {
-  console.log("✔ تم العثور على GEMINI_API_KEY واستخدام موديل Gemini المباشر جاهز");
+// يساعد على التحقق سريعاً من أن OPENAI_API_KEY مقروء فعلاً من .env دون كشف قيمته.
+if (process.env["OPENAI_API_KEY"]) {
+  console.log(`✔ تم العثور على OPENAI_API_KEY والاتصال بـ OpenAI جاهز (${OPENAI_MODEL})`);
 }
 
 export type ContentPart =
@@ -49,8 +52,9 @@ export class AiError extends Error {
 }
 
 function friendly(status: number, body: string) {
-  if (status === 401 || status === 403) return "مفتاح GEMINI_API_KEY غير صالح أو منتهي الصلاحية.";
+  if (status === 401 || status === 403) return "مفتاح OPENAI_API_KEY غير صالح أو منتهي الصلاحية.";
   if (status === 429) return "الطلبات كثيرة الآن، جرّب بعد لحظات.";
+  if (status === 402) return "رصيد الفوترة غير كافٍ في حساب OpenAI.";
   return `تعذّر تحليل الطلب (${status}): ${body.slice(0, 300)}`;
 }
 
@@ -65,220 +69,43 @@ interface Choice {
   message: { content: string | null; tool_calls?: ToolCall[] };
 }
 
-// ---------------------------------------------------------------------------
-// تحويل الرسائل/الأدوات من أسلوب OpenAI (المستخدَم داخلياً في المشروع) إلى بنية
-// Gemini الأصلية (contents/parts)، ثم إعادة تنسيق الرد إلى شكل Choice.message نفسه.
-// ---------------------------------------------------------------------------
-
-interface GeminiPart {
-  text?: string;
-  inlineData?: { mimeType: string; data: string };
-  functionCall?: { name: string; args?: Record<string, unknown> };
-  functionResponse?: { name: string; response: Record<string, unknown> };
-}
-
-interface GeminiContent {
-  role: "user" | "model";
-  parts: GeminiPart[];
-}
-
-interface GeminiGenerateContentResponse {
-  candidates?: Array<{
-    content?: { parts?: GeminiPart[] };
-    finishReason?: string;
-  }>;
-  promptFeedback?: { blockReason?: string };
-}
-
-/** يفكّك data URL (data:image/png;base64,....) إلى ما تحتاجه Gemini (inlineData). */
-function dataUrlToInline(url: string): { mimeType: string; data: string } | null {
-  const match = /^data:([^;]+);base64,(.+)$/s.exec(url);
-  if (!match) return null;
-  return { mimeType: match[1]!, data: match[2]! };
-}
-
-function contentToGeminiParts(content: ChatMessage["content"]): GeminiPart[] {
-  if (content == null) return [];
-  if (typeof content === "string") return content ? [{ text: content }] : [];
-  return content.map((part): GeminiPart => {
-    if (part.type === "text") return { text: part.text };
-    const inline = dataUrlToInline(part.image_url.url);
-    return inline ? { inlineData: inline } : { text: "" };
-  });
-}
-
-/**
- * يحوّل تاريخ الرسائل بأسلوب OpenAI (system/user/assistant/tool) إلى بنية Gemini
- * (systemInstruction + contents بأدوار user/model، وfunctionCall/functionResponse
- * بدل tool_calls/tool). يتتبّع اسم كل استدعاء أداة عبر خريطة id→name محلية لأن رسائل
- * "tool" في تاريخنا الداخلي تحمل فقط tool_call_id (بأسلوب OpenAI) لا اسم الدالة.
- */
-function toGeminiContents(messages: ChatMessage[]): {
-  systemInstruction: { parts: GeminiPart[] } | null;
-  contents: GeminiContent[];
-} {
-  let systemText = "";
-  const contents: GeminiContent[] = [];
-  const callIdToName = new Map<string, string>();
-
-  for (const message of messages) {
-    if (message.role === "system") {
-      const text = typeof message.content === "string" ? message.content : "";
-      systemText += systemText ? `\n${text}` : text;
-      continue;
-    }
-
-    if (message.role === "user") {
-      contents.push({ role: "user", parts: contentToGeminiParts(message.content) });
-      continue;
-    }
-
-    if (message.role === "assistant") {
-      const parts: GeminiPart[] = [];
-      const text = typeof message.content === "string" ? message.content : "";
-      if (text) parts.push({ text });
-      for (const call of message.tool_calls ?? []) {
-        callIdToName.set(call.id, call.function.name);
-        let args: Record<string, unknown> = {};
-        try {
-          args = call.function.arguments ? JSON.parse(call.function.arguments) : {};
-        } catch {
-          args = {};
-        }
-        parts.push({ functionCall: { name: call.function.name, args } });
-      }
-      contents.push({ role: "model", parts });
-      continue;
-    }
-
-    if (message.role === "tool") {
-      const name = (message.tool_call_id && callIdToName.get(message.tool_call_id)) || "unknown";
-      let response: Record<string, unknown>;
-      try {
-        response =
-          typeof message.content === "string" && message.content
-            ? (JSON.parse(message.content) as Record<string, unknown>)
-            : {};
-      } catch {
-        response = { result: message.content };
-      }
-      // نتائج الأدوات تُرسَل لـ Gemini كجزء functionResponse ضمن دور "user" (مطابق لأمثلة Google الرسمية).
-      contents.push({ role: "user", parts: [{ functionResponse: { name, response } }] });
-    }
-  }
-
-  return { systemInstruction: systemText ? { parts: [{ text: systemText }] } : null, contents };
-}
-
-/** يحوّل قيم "type" في مخطط JSON من صيغة OpenAI (lowercase) إلى صيغة Gemini (UPPERCASE)، تكرارياً. */
-function toGeminiSchema(schema: unknown): unknown {
-  if (schema === null || typeof schema !== "object") return schema;
-  if (Array.isArray(schema)) return schema.map((item) => toGeminiSchema(item));
-
-  const input = schema as Record<string, unknown>;
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(input)) {
-    if (key === "type" && typeof value === "string") {
-      out[key] = value.toUpperCase();
-    } else if (key === "properties" && value && typeof value === "object") {
-      const props: Record<string, unknown> = {};
-      for (const [propKey, propValue] of Object.entries(value as Record<string, unknown>)) {
-        props[propKey] = toGeminiSchema(propValue);
-      }
-      out[key] = props;
-    } else if (key === "items") {
-      out[key] = toGeminiSchema(value);
-    } else {
-      out[key] = value;
-    }
-  }
-  return out;
-}
-
-function toGeminiFunctionDeclaration(tool: ToolDef) {
-  return {
-    name: tool.function.name,
-    description: tool.function.description,
-    parameters: toGeminiSchema(tool.function.parameters),
-  };
-}
-
-/** يستخرج النص والأدوات المستدعاة من رد Gemini، ويعيدها بشكل Choice.message المعتاد. */
-function fromGeminiResponse(data: GeminiGenerateContentResponse): Choice["message"] {
-  const candidate = data.candidates?.[0];
-  if (!candidate) {
-    const block = data.promptFeedback?.blockReason;
-    throw new AiError(
-      502,
-      block ? `تعذّر توليد الرد: تم حجبه (${block}).` : "لم يصل رد من Gemini.",
-    );
-  }
-
-  const parts = candidate.content?.parts ?? [];
-  const textParts = parts
-    .filter(
-      (p): p is GeminiPart & { text: string } => typeof p.text === "string" && p.text.length > 0,
-    )
-    .map((p) => p.text);
-  const functionCallParts = parts.filter((p) => p.functionCall);
-
-  const tool_calls: ToolCall[] | undefined = functionCallParts.length
-    ? functionCallParts.map((p, i) => ({
-        id: `call_${Date.now()}_${i}`,
-        type: "function" as const,
-        function: {
-          name: p.functionCall!.name,
-          arguments: JSON.stringify(p.functionCall!.args ?? {}),
-        },
-      }))
-    : undefined;
-
-  return {
-    content: textParts.length ? textParts.join("\n") : null,
-    ...(tool_calls ? { tool_calls } : {}),
-  };
-}
-
-/** نداء مباشر لـ Gemini API — بلا أي بوابة وسيطة. */
+/** نداء مباشر لـ OpenAI — بلا أي بوابة وسيطة أخرى. */
 export async function callGemini({
   messages,
   tools,
   jsonOutput,
   maxTokens,
 }: CallOptions): Promise<Choice["message"]> {
-  const apiKey = process.env["GEMINI_API_KEY"];
+  const apiKey = process.env["OPENAI_API_KEY"];
   if (!apiKey) {
-    throw new AiError(500, "مفتاح الذكاء الاصطناعي غير مهيّأ — أضف GEMINI_API_KEY في .env.");
+    throw new AiError(500, "مفتاح الذكاء الاصطناعي غير مهيّأ — أضف OPENAI_API_KEY في .env.");
   }
 
-  const { systemInstruction, contents } = toGeminiContents(messages);
-
-  const generationConfig: Record<string, unknown> = {};
-  if (jsonOutput) generationConfig["responseMimeType"] = "application/json";
-  if (maxTokens) generationConfig["maxOutputTokens"] = maxTokens;
-
-  const body: Record<string, unknown> = { contents };
-  if (systemInstruction) body["systemInstruction"] = systemInstruction;
-  if (tools?.length) {
-    body["tools"] = [{ functionDeclarations: tools.map(toGeminiFunctionDeclaration) }];
-  }
-  if (Object.keys(generationConfig).length) body["generationConfig"] = generationConfig;
-
-  // المفتاح يُمرَّر عبر الهيدر X-goog-api-key مباشرة إلى Google — بلا أي بوابة وسيطة.
-  const res = await fetch(GEMINI_ENDPOINT, {
+  const res = await fetch(OPENAI_ENDPOINT, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
-    body: JSON.stringify(body),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      messages,
+      ...(tools ? { tools } : {}),
+      ...(jsonOutput ? { response_format: { type: "json_object" } } : {}),
+      ...(maxTokens ? { max_tokens: maxTokens } : {}),
+    }),
   });
 
   if (!res.ok) {
-    const bodyText = await res.text();
-    console.error("Gemini API error", res.status, bodyText);
-    throw new AiError(res.status, friendly(res.status, bodyText));
+    const body = await res.text();
+    console.error("OpenAI API error", res.status, body);
+    throw new AiError(res.status, friendly(res.status, body));
   }
 
-  const data = (await res.json()) as GeminiGenerateContentResponse;
-  return fromGeminiResponse(data);
+  const data = (await res.json()) as { choices?: Choice[] };
+  const message = data.choices?.[0]?.message;
+  if (!message) throw new AiError(502, "لم يصل رد من الذكاء الاصطناعي.");
+  return message;
 }
 
 /** يستخرج JSON من نص الموديل حتى لو كان محاطاً بشرح أو ```json. */
@@ -294,6 +121,7 @@ export function parseJsonOutput<T>(raw: string | null): T {
   try {
     return JSON.parse(candidate) as T;
   } catch {
+    console.error("[parseJsonOutput Error] Raw model output:\n", raw);
     throw new AiError(502, "تعذّر قراءة نتيجة الذكاء الاصطناعي، حاول مرة أخرى.");
   }
 }
@@ -313,7 +141,10 @@ export async function runWithTools(
     const message = await callGemini({
       messages: history,
       ...(isLast ? { jsonOutput: true } : { tools }),
-      maxTokens: 4000,
+      // رحلة ٧ أيام × ٥ محطات (الحد الأقصى من الويزارد) بحقول المحطة الحالية قد تتجاوز
+      // بسهولة 4000 توكن فتُقطَع في المنتصف ويفشل تحليل JSON. لسنا على حصة Groq الضيّقة
+      // بعد الآن (OpenAI مدفوع)، فنستخدم مساحة قريبة من حد gpt-4o-mini الأقصى (16384).
+      maxTokens: isLast ? 16000 : 1200,
     });
 
     if (!message.tool_calls?.length) return message.content;

@@ -17,6 +17,16 @@ export interface JourneyStop {
   endTime: string;
   title: string;
   place: string;
+  /**
+   * سياق مكان دقيق وقابل للتحديد الجغرافي (Place Context) من الذكاء الاصطناعي — اسم
+   * المعلم/الحي الكامل بدل اسم مدينة عام، يُستخدم كنص استعلام أساسي لـ Google Places
+   * (انظر resolveGeocodeQuery) لتغذية الخريطة التفاعلية بإحداثيات دقيقة.
+   */
+  placeQuery: string;
+  /** الحي/المنطقة داخل المدينة من الذكاء الاصطناعي (مثال: "حطين") — يُدمج مع placeQuery للاستعلام. */
+  locationContext: string;
+  /** ترتيب المحطة كما رآه الموديل — إعلامي فقط؛ order أعلاه (فهرس المصفوفة) هو المعتمد للعرض والمسار. */
+  sequenceOrder: number;
   destinationId: string;
   indoor: boolean;
   travel: string;
@@ -53,13 +63,28 @@ export interface GeocodeQuery {
   placeId?: string;
 }
 
-/** يحدّد نص/مفتاح استعلام Places لمحطة، مفضِّلاً الاسم الرسمي المعروف عند توفره. */
+/**
+ * يحدّد نص/مفتاح استعلام Places لمحطة، بالأولوية التالية:
+ * ١) اسم رسمي معروف موثّق يدوياً (KNOWN_PLACE_QUERIES) لمعالم واجهنا فيها غموضاً سابقاً.
+ * ٢) placeQuery القادم من الذكاء الاصطناعي مباشرة — سياق مكان دقيق مصمَّم خصيصاً لهذا الغرض.
+ * ٣) heuristic احتياطي (place/title + المدينة) لو غاب placeQuery لأي سبب (توافق قديم).
+ */
 export function resolveGeocodeQuery(
-  item: Pick<JourneyStop, "id" | "place" | "title" | "destinationId">,
+  item: Pick<
+    JourneyStop,
+    "id" | "place" | "title" | "destinationId" | "placeQuery" | "locationContext"
+  >,
 ): GeocodeQuery {
   const city = getDestination(item.destinationId)?.city ?? "";
   const specific = item.place && item.place !== city ? item.place : item.title;
-  const query = KNOWN_PLACE_QUERIES[specific] ?? [specific, city].filter(Boolean).join("، ");
+  // ندمج placeQuery (اسم المعلم الكامل) مع locationContext (الحي) إن كان الأخير مضافاً فعلاً
+  // معلومة جديدة (وليس مكرَّراً داخل placeQuery نفسه) — سياق مكان أقوى للبحث الجغرافي.
+  const aiQuery = item.placeQuery?.trim();
+  const context = item.locationContext?.trim();
+  const richAiQuery =
+    aiQuery && context && !aiQuery.includes(context) ? `${aiQuery}، ${context}` : aiQuery;
+  const query =
+    KNOWN_PLACE_QUERIES[specific] ?? (richAiQuery || [specific, city].filter(Boolean).join("، "));
   const key = `${item.id}-${specific}`;
   const knownPlaceId = KNOWN_PLACE_IDS[specific];
   return knownPlaceId ? { key, query, placeId: knownPlaceId } : { key, query };
@@ -102,6 +127,12 @@ export interface AiItineraryStop {
   title: string;
   destinationId: string;
   place: string;
+  /** سياق مكان دقيق لجلب إحداثيات الخريطة — انظر توثيق JourneyStop.placeQuery أعلاه. */
+  placeQuery: string;
+  /** انظر توثيق JourneyStop.locationContext أعلاه. */
+  locationContext: string;
+  /** انظر توثيق JourneyStop.sequenceOrder أعلاه. */
+  sequenceOrder: number;
   indoor: boolean;
   weatherNote: string;
   travel: string;
@@ -128,6 +159,11 @@ export function buildJourneyFromItinerary(dayStops: AiItineraryStop[]): JourneyS
       endTime,
       title: stop.title,
       place: stop.place,
+      placeQuery: stop.placeQuery || stop.place || stop.title,
+      locationContext: stop.locationContext || "",
+      // order (فهرس المصفوفة) هو المعتمد فعلياً لضمان تسلسل مسار ثابت دون ثغرات/تكرار حتى
+      // لو أخطأ الموديل برقم sequenceOrder؛ نحتفظ بقيمته كإعلام فقط.
+      sequenceOrder: stop.sequenceOrder || index + 1,
       destinationId: stop.destinationId,
       indoor: stop.indoor,
       travel: stop.travel,

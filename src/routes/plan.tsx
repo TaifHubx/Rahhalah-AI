@@ -12,10 +12,10 @@ export const Route = createFileRoute("/plan")({
       { title: "خطط رحلتي بذكاء | رحّالة" },
       {
         name: "description",
-        content: "أجب عن خمس خطوات بسيطة ليصمم رحّالة خطة رحلة سعودية مخصصة لك.",
+        content: "أجب عن أربع خطوات بسيطة ليصمم رحّالة خطة رحلة سعودية مخصصة لك.",
       },
       { property: "og:title", content: "خطط رحلتي بذكاء | رحّالة" },
-      { property: "og:description", content: "خمس خطوات سريعة وتحصل على جدول رحلة جاهز." },
+      { property: "og:description", content: "أربع خطوات سريعة وتحصل على جدول رحلة جاهز." },
     ],
   }),
   component: PlanPage,
@@ -26,7 +26,6 @@ type Answers = {
   companion: string;
   types: string[];
   access: string;
-  days: number;
 };
 
 function OptionButton({
@@ -61,7 +60,6 @@ const steps = [
   "مع من تسافر؟",
   "ما نوع الأماكن التي تفضلها؟",
   "احتياجات الوصول",
-  "مدة الرحلة",
 ];
 
 function PlanPage() {
@@ -71,19 +69,17 @@ function PlanPage() {
     companion: "",
     types: [],
     access: "",
-    days: 3,
   });
 
   const canNext =
     (step === 0 && answers.city) ||
     (step === 1 && answers.companion) ||
     (step === 2 && answers.types.length > 0) ||
-    (step === 3 && answers.access) ||
-    step === 4;
+    (step === 3 && answers.access);
 
   return (
     <div>
-      <PageHeader title="لنبنِ رحلتك" subtitle="خمس خطوات قصيرة فقط — بدون نماذج طويلة." />
+      <PageHeader title="لنبنِ رحلتك" subtitle="أربع خطوات قصيرة فقط — بدون نماذج طويلة." />
 
       <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="flex items-center gap-2" aria-hidden>
@@ -149,33 +145,6 @@ function PlanPage() {
                 {n}
               </OptionButton>
             ))}
-
-          {step === 4 && (
-            <div className="sm:col-span-2 rounded-2xl border border-border bg-card p-5">
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-sm text-muted-foreground">عدد الأيام</span>
-                <span className="text-3xl font-bold text-primary">{answers.days}</span>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {[1, 2, 3, 4, 5, 7].map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    aria-pressed={answers.days === d}
-                    onClick={() => setAnswers((a) => ({ ...a, days: d }))}
-                    className={cn(
-                      "min-h-11 min-w-11 rounded-xl border px-4 text-sm font-medium",
-                      answers.days === d
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border hover:bg-secondary",
-                    )}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -199,7 +168,6 @@ function PlanPage() {
                   companion: answers.companion,
                   types: answers.types,
                   access: answers.access,
-                  days: answers.days,
                 }}
               >
                 أنشئ رحلتي ✨

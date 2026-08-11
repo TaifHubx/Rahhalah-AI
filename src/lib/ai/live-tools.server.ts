@@ -51,8 +51,10 @@ export async function getWeather(args: Record<string, unknown>) {
 export async function getPrayerTimes(args: Record<string, unknown>) {
   const city = String(args["city"] ?? "الرياض");
   try {
+    // نُثبّت المنطقة الزمنية صراحة (Asia/Riyadh — تغطي السعودية كلها، منطقة زمنية واحدة UTC+3)
+    // بدل الاعتماد على استنتاج Aladhan التلقائي من اسم المدينة، تفادياً لأي التباس في التوقيت.
     const res = await fetch(
-      `https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(city)}&country=Saudi%20Arabia&method=4`,
+      `https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(city)}&country=Saudi%20Arabia&method=4&timezonestring=Asia%2FRiyadh`,
     );
     if (!res.ok) return { city, error: "تعذّر جلب أوقات الصلاة" };
     const data = (await res.json()) as { data?: { timings?: Record<string, string> } };
