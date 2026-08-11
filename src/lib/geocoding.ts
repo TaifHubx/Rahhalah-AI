@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { loadGoogleMapsLibrary } from "@/lib/google-maps-client";
 
 /**
@@ -113,4 +114,94 @@ export async function resolvePlaceCoords(params: {
     if (byId) return byId;
   }
   return geocodePlace(params.query, params.city);
+}
+
+export interface LiveDestinationStatus {
+  /** null = لم تنشر Google بيانات ساعات عمل موثوقة لهذا المكان (وليس بالضرورة "مغلق"). */
+  openNow: boolean | null;
+  /** null = لم تنشر Google بيانات وصول لذوي الهمم لهذا المكان (وليس بالضرورة "غير مهيّأ"). */
+  wheelchairAccessible: boolean | null;
+}
+
+const statusCache = new Map<string, LiveDestinationStatus | null>();
+
+/**
+ * حالة حيّة من Google Places (New) لمعلم سياحي: هل هو مفتوح الآن فعلياً، وهل مدخله
+ * مهيّأ لذوي الهمم — عبر الحقلين الرسميين regularOpeningHours/isOpen() وaccessibilityOptions.
+ * لا يوجد حقل مكافئ لـ"مناسب للعائلات" في Google Places إطلاقاً، فلا نحاول استنتاجه هنا.
+ */
+export async function fetchDestinationLiveStatus(
+  name: string,
+  city: string,
+): Promise<LiveDestinationStatus | null> {
+  const key = `status|${city}|${name}`;
+  if (statusCache.has(key)) return statusCache.get(key) ?? null;
+
+  try {
+    const places = await loadGoogleMapsLibrary("places");
+    const { places: results } = await places.Place.searchByText({
+      textQuery: `${name}، ${city}`,
+      fields: ["id", "location", "regularOpeningHours", "accessibilityOptions"],
+      locationBias: biasFor(city),
+      language: "ar",
+      region: "sa",
+      maxResultCount: 1,
+    });
+
+    const place = results[0];
+    if (!place) {
+      statusCache.set(key, null);
+      return null;
+    }
+
+    // isOpen() مبني على regularOpeningHours/currentOpeningHours المطلوبين أعلاه في fields —
+    // يعيد undefined لو لم تنشر Google ساعات عمل لهذا المكان (وليس بالضرورة "مغلق فعلاً").
+    let openNow: boolean | null = null;
+    try {
+      const open = await place.isOpen();
+      openNow = open ?? null;
+    } catch {
+      openNow = null;
+    }
+
+    const status: LiveDestinationStatus = {
+      openNow,
+      wheelchairAccessible: place.accessibilityOptions?.hasWheelchairAccessibleEntrance ?? null,
+    };
+    statusCache.set(key, status);
+    return status;
+  } catch (err) {
+    console.error("تعذّر جلب حالة المكان الحية عبر Google Places:", key, err);
+    return null;
+  }
+}
+
+/**
+ * Hook عميل لبطاقات الوجهات: يجلب حالة "مفتوح الآن" و"مناسب لذوي الهمم" الحيّة من Google
+ * Places عند التركيب، مع استخدام القيمة الثابتة المخزّنة محلياً (fallback) بانتظار الرد أو
+ * لو تعذّر الجلب — لا تُخفى الشارة أبداً، فقط تتحدّث لقيمة حقيقية إن توفرت.
+ */
+export function useLiveDestinationStatus(
+  name: string,
+  city: string,
+  fallback: { isOpen: boolean; accessible: boolean },
+) {
+  const [status, setStatus] = useState<LiveDestinationStatus | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setStatus(null);
+    void fetchDestinationLiveStatus(name, city).then((result) => {
+      if (!cancelled) setStatus(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [name, city]);
+
+  return {
+    isOpen: status?.openNow ?? fallback.isOpen,
+    accessible: status?.wheelchairAccessible ?? fallback.accessible,
+    isLive: status !== null,
+  };
 }

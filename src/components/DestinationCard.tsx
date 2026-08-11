@@ -2,7 +2,9 @@ import { Link } from "@tanstack/react-router";
 import { MapPin, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Chip, OpenStatus } from "@/components/StatusChips";
-import type { Destination } from "@/lib/mock-data";
+import { useI18n } from "@/lib/i18n";
+import { useLiveDestinationStatus } from "@/lib/geocoding";
+import { localizeDestination, type Destination } from "@/lib/mock-data";
 
 export function DestinationCard({
   destination,
@@ -15,12 +17,21 @@ export function DestinationCard({
   added?: boolean;
   showRating?: boolean;
 }) {
+  const { t, lang } = useI18n();
+  const text = localizeDestination(destination, lang, t);
+  // "مفتوح الآن" و"مناسب لذوي الهمم" حيّان فعلاً من Google Places — تُستبدَل القيمة الثابتة
+  // المخزّنة محلياً فور وصول رد Google (fallback بانتظاره أو لو تعذّر الجلب). لا يوجد حقل
+  // "مناسب للعائلات" حقيقي في Google Places إطلاقاً، فتلك الشارة أُزيلت نهائياً.
+  const live = useLiveDestinationStatus(destination.name, destination.city, {
+    isOpen: destination.isOpen,
+    accessible: destination.accessible,
+  });
   return (
     <article className="flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[var(--shadow-card)]">
       <div className="aspect-[4/3] overflow-hidden">
         <img
           src={destination.image}
-          alt={destination.name}
+          alt={text.name}
           loading="lazy"
           width={1024}
           height={768}
@@ -31,12 +42,12 @@ export function DestinationCard({
       <div className="flex min-w-0 flex-1 flex-col gap-3 p-4">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
           <div className="min-w-0">
-            <h3 className="truncate text-lg font-bold text-foreground">{destination.name}</h3>
+            <h3 className="truncate text-lg font-bold text-foreground">{text.name}</h3>
             <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
               <MapPin className="size-3.5 shrink-0" aria-hidden />
-              <span className="truncate">{destination.city}</span>
+              <span className="truncate">{text.cityLabel}</span>
               <span aria-hidden>•</span>
-              <span className="truncate">{destination.category}</span>
+              <span className="truncate">{text.categoryLabel}</span>
             </p>
           </div>
           {showRating && (
@@ -48,21 +59,20 @@ export function DestinationCard({
         </div>
 
         <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-          {destination.description}
+          {text.description}
         </p>
 
         <div className="flex flex-wrap gap-1.5">
-          <OpenStatus isOpen={destination.isOpen} />
-          {destination.familyFriendly && <Chip tone="gold">👨‍👩‍👧 مناسب للعائلات</Chip>}
-          <Chip tone={destination.accessible ? "success" : "neutral"}>
-            {destination.accessible ? "♿ مناسب لأصحاب الهمم" : "♿ وصول محدود"}
+          <OpenStatus isOpen={live.isOpen} />
+          <Chip tone={live.accessible ? "success" : "neutral"}>
+            {live.accessible ? t("card.accessible") : t("card.limitedAccess")}
           </Chip>
         </div>
 
         <div className="mt-auto flex flex-wrap gap-2 pt-1">
           <Button asChild size="sm" className="flex-1">
             <Link to="/destination/$id" params={{ id: destination.id }}>
-              {onAdd ? "عرض التفاصيل" : "استكشف"}
+              {onAdd ? t("card.viewDetails") : t("card.explore")}
             </Link>
           </Button>
           {onAdd && (
@@ -72,7 +82,7 @@ export function DestinationCard({
               className="flex-1"
               onClick={() => onAdd(destination.id)}
             >
-              {added ? "✓ في رحلتي" : "أضف لرحلتي"}
+              {added ? t("card.inTrip") : t("card.addToTrip")}
             </Button>
           )}
         </div>

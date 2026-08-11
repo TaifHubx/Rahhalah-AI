@@ -3,6 +3,7 @@ import { Brain, RefreshCw, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DestinationCard } from "@/components/DestinationCard";
 import { destinations } from "@/lib/mock-data";
+import { useI18n } from "@/lib/i18n";
 import heroImg from "@/assets/hero-diriyah.jpg";
 
 export const Route = createFileRoute("/")({
@@ -24,23 +25,21 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const pillars = [
-  { icon: Brain, title: "خطط بذكاء", text: "اختياراتك تصنع خطة رحلة مخصصة في ثوانٍ." },
-  { icon: RefreshCw, title: "تكيّف لحظياً", text: "نعدّل جدولك مع الطقس والازدحام والحجوزات." },
-  { icon: Trophy, title: "استكشف واستمتع", text: "تحديات تصوير ونقاط قابلة للاستبدال بمكافآت." },
-];
-
 function Index() {
-  const popular = destinations.filter((d) =>
-    ["diriyah", "alula", "jeddah", "abha"].includes(d.id),
-  );
+  const { t } = useI18n();
+  const popular = destinations.filter((d) => ["diriyah", "alula", "jeddah", "abha"].includes(d.id));
+  const pillars = [
+    { icon: Brain, title: t("home.pillar1Title"), text: t("home.pillar1Text") },
+    { icon: RefreshCw, title: t("home.pillar2Title"), text: t("home.pillar2Text") },
+    { icon: Trophy, title: t("home.pillar3Title"), text: t("home.pillar3Text") },
+  ];
 
   return (
     <div>
       <section className="relative">
         <img
           src={heroImg}
-          alt="حي الطريف في الدرعية عند الغروب"
+          alt={t("home.heroAlt")}
           width={1920}
           height={1088}
           className="absolute inset-0 size-full object-cover"
@@ -49,20 +48,20 @@ function Index() {
         <div className="relative mx-auto max-w-6xl px-4 py-20 sm:py-28">
           <div className="max-w-2xl">
             <span className="inline-flex items-center gap-2 rounded-full bg-gold px-3 py-1 text-xs font-bold text-gold-foreground">
-              مدعوم بالذكاء الاصطناعي
+              {t("home.badge")}
             </span>
             <h1 className="mt-5 text-3xl leading-tight font-bold text-primary-foreground sm:text-5xl">
-              رحلتك للسعودية تبدأ من هنا 🇸🇦
+              {t("home.title")}
             </h1>
             <p className="mt-4 text-base leading-relaxed text-primary-foreground/85 sm:text-lg">
-              اكتشف وجهات تناسبك، خطط رحلتك بذكاء، واستمتع بتجربة تتكيف معك لحظة بلحظة.
+              {t("home.subtitle")}
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Button asChild size="lg" variant="gold">
-                <Link to="/plan">خطط رحلتي</Link>
+                <Link to="/plan">{t("home.planCta")}</Link>
               </Button>
               <Button asChild size="lg" variant="onDark">
-                <Link to="/explore">استكشف الوجهات</Link>
+                <Link to="/explore">{t("home.exploreCta")}</Link>
               </Button>
             </div>
           </div>
@@ -86,11 +85,11 @@ function Index() {
       <section className="mx-auto max-w-6xl px-4 py-12">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
           <div className="min-w-0">
-            <h2 className="text-2xl font-bold">وجهات شهيرة</h2>
-            <p className="mt-1 text-sm text-muted-foreground">الأكثر زيارة هذا الأسبوع</p>
+            <h2 className="text-2xl font-bold">{t("home.popularTitle")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t("home.popularSubtitle")}</p>
           </div>
           <Button asChild variant="ghost" className="shrink-0">
-            <Link to="/explore">عرض الكل</Link>
+            <Link to="/explore">{t("home.viewAll")}</Link>
           </Button>
         </div>
 

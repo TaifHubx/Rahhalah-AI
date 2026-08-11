@@ -11,7 +11,9 @@ type State = {
   completedChallenges: string[];
 };
 
-let state: State = { points: 350, tripIds: ["diriyah"], completedChallenges: [] };
+// يبدأ الزائر غير المسجَّل من صفر حقيقي — نفس منطق الحساب المسجَّل فعلياً (Supabase)، بلا أي
+// نقاط أو رحلة تجريبية مسبقة الملء توحي بفعل لم يحدث فعلاً.
+let state: State = { points: 0, tripIds: [], completedChallenges: [] };
 const listeners = new Set<() => void>();
 
 function set(next: Partial<State>) {

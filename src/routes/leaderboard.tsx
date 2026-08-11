@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useLeaderboard } from "@/lib/progress";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
-import { destinations } from "@/lib/mock-data";
+import { destinations, localizeDestination } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/leaderboard")({
@@ -27,7 +27,7 @@ export const Route = createFileRoute("/leaderboard")({
 const rankIcons = [Crown, Trophy, Medal];
 
 function LeaderboardPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { user } = useAuth();
   const [scope, setScope] = useState<string | null>(null);
   const { data, isPending, isError } = useLeaderboard(scope);
@@ -52,7 +52,7 @@ function LeaderboardPage() {
               variant={scope === d.id ? "default" : "outline"}
               onClick={() => setScope(d.id)}
             >
-              {d.name}
+              {localizeDestination(d, lang, t).name}
             </Button>
           ))}
         </div>
@@ -72,7 +72,9 @@ function LeaderboardPage() {
           ) : isError ? (
             <p className="p-8 text-center text-sm text-muted-foreground">{t("common.error")}</p>
           ) : (data?.length ?? 0) === 0 ? (
-            <p className="p-8 text-center text-sm text-muted-foreground">{t("leaderboard.empty")}</p>
+            <p className="p-8 text-center text-sm text-muted-foreground">
+              {t("leaderboard.empty")}
+            </p>
           ) : (
             <ol>
               {data!.map((row, index) => {
@@ -87,7 +89,11 @@ function LeaderboardPage() {
                     )}
                   >
                     <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-secondary text-sm font-bold">
-                      {Icon ? <Icon className="size-4 text-gold-foreground" aria-hidden /> : index + 1}
+                      {Icon ? (
+                        <Icon className="size-4 text-gold-foreground" aria-hidden />
+                      ) : (
+                        index + 1
+                      )}
                     </span>
                     <span className="min-w-0 truncate font-medium">
                       {row.name}

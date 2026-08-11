@@ -3,7 +3,17 @@ import { useState } from "react";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
-import { accessNeeds, cities, placeTypes, tripCompanions } from "@/lib/mock-data";
+import {
+  ACCESS_NEED_LABEL_EN,
+  accessNeeds,
+  CITY_LABEL_EN,
+  cities,
+  COMPANION_LABEL_EN,
+  PLACE_TYPE_LABEL_EN,
+  placeTypes,
+  tripCompanions,
+} from "@/lib/mock-data";
+import { useI18n, type TranslationKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/plan")({
@@ -55,14 +65,13 @@ function OptionButton({
   );
 }
 
-const steps = [
-  "أين تريد الذهاب؟",
-  "مع من تسافر؟",
-  "ما نوع الأماكن التي تفضلها؟",
-  "احتياجات الوصول",
-];
+// عناوين الخطوات مترجمة عبر i18n؛ قيم الخيارات نفسها (المدن، أنواع الرفقة...) تبقى عربية
+// ثابتة داخلياً لأنها تُرسل كما هي لبناء الرحلة بالذكاء الاصطناعي وربط الإحداثيات الجغرافية —
+// فقط تسمية العرض تُترجم عبر خرائط *_LABEL_EN أعلاه، بنفس نمط explore.tsx/mock-data.ts.
+const stepTitles: TranslationKey[] = ["plan.step0", "plan.step1", "plan.step2", "plan.step3"];
 
 function PlanPage() {
+  const { t, tf, lang } = useI18n();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Answers>({
     city: "",
@@ -79,11 +88,11 @@ function PlanPage() {
 
   return (
     <div>
-      <PageHeader title="لنبنِ رحلتك" subtitle="أربع خطوات قصيرة فقط — بدون نماذج طويلة." />
+      <PageHeader title={t("plan.title")} subtitle={t("plan.subtitle")} />
 
       <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="flex items-center gap-2" aria-hidden>
-          {steps.map((_, i) => (
+          {stepTitles.map((_, i) => (
             <span
               key={i}
               className={cn("h-1.5 flex-1 rounded-full", i <= step ? "bg-gold" : "bg-border")}
@@ -91,10 +100,10 @@ function PlanPage() {
           ))}
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          الخطوة {step + 1} من {steps.length}
+          {tf("plan.stepOf", { n: step + 1, m: stepTitles.length })}
         </p>
 
-        <h2 className="mt-4 text-xl font-bold">{steps[step]}</h2>
+        <h2 className="mt-4 text-xl font-bold">{t(stepTitles[step]!)}</h2>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           {step === 0 &&
@@ -104,7 +113,7 @@ function PlanPage() {
                 selected={answers.city === c}
                 onClick={() => setAnswers((a) => ({ ...a, city: c }))}
               >
-                {c}
+                {lang === "en" ? (CITY_LABEL_EN[c] ?? c) : c}
               </OptionButton>
             ))}
 
@@ -115,23 +124,25 @@ function PlanPage() {
                 selected={answers.companion === c}
                 onClick={() => setAnswers((a) => ({ ...a, companion: c }))}
               >
-                {c}
+                {lang === "en" ? (COMPANION_LABEL_EN[c] ?? c) : c}
               </OptionButton>
             ))}
 
           {step === 2 &&
-            placeTypes.map((t) => (
+            placeTypes.map((t2) => (
               <OptionButton
-                key={t}
-                selected={answers.types.includes(t)}
+                key={t2}
+                selected={answers.types.includes(t2)}
                 onClick={() =>
                   setAnswers((a) => ({
                     ...a,
-                    types: a.types.includes(t) ? a.types.filter((x) => x !== t) : [...a.types, t],
+                    types: a.types.includes(t2)
+                      ? a.types.filter((x) => x !== t2)
+                      : [...a.types, t2],
                   }))
                 }
               >
-                {t}
+                {lang === "en" ? (PLACE_TYPE_LABEL_EN[t2] ?? t2) : t2}
               </OptionButton>
             ))}
 
@@ -142,7 +153,7 @@ function PlanPage() {
                 selected={answers.access === n}
                 onClick={() => setAnswers((a) => ({ ...a, access: n }))}
               >
-                {n}
+                {lang === "en" ? (ACCESS_NEED_LABEL_EN[n] ?? n) : n}
               </OptionButton>
             ))}
         </div>
@@ -151,12 +162,12 @@ function PlanPage() {
           {step > 0 && (
             <Button variant="outline" onClick={() => setStep((s) => s - 1)}>
               <ArrowRight className="size-4" aria-hidden />
-              السابق
+              {t("plan.back")}
             </Button>
           )}
-          {step < steps.length - 1 ? (
+          {step < stepTitles.length - 1 ? (
             <Button disabled={!canNext} onClick={() => setStep((s) => s + 1)}>
-              التالي
+              {t("plan.next")}
               <ArrowLeft className="size-4" aria-hidden />
             </Button>
           ) : (
@@ -170,12 +181,12 @@ function PlanPage() {
                   access: answers.access,
                 }}
               >
-                أنشئ رحلتي ✨
+                {t("plan.create")}
               </Link>
             </Button>
           )}
           <Button asChild variant="ghost">
-            <Link to="/explore">تخطي والاستكشاف</Link>
+            <Link to="/explore">{t("plan.skip")}</Link>
           </Button>
         </div>
       </div>

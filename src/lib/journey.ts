@@ -144,7 +144,10 @@ export interface AiItineraryStop {
  * تبدأ عند FALLBACK_CENTER بانتظار جلبها من Google Places). استدعِ withGeocodedCoords()
  * ثم withComputedDistances() فوق الناتج لإكمال الموقع والمسافات الفعلية.
  */
-export function buildJourneyFromItinerary(dayStops: AiItineraryStop[]): JourneyStop[] {
+export function buildJourneyFromItinerary(
+  dayStops: AiItineraryStop[],
+  lang: "ar" | "en" = "ar",
+): JourneyStop[] {
   return dayStops.map((stop, index) => {
     const next = dayStops[index + 1];
     // نُقدّر مدة المحطة من الفجوة الزمنية حتى المحطة التالية في نفس جدول الذكاء الاصطناعي
@@ -152,6 +155,10 @@ export function buildJourneyFromItinerary(dayStops: AiItineraryStop[]): JourneyS
     const durationMin = next ? Math.max(30, toMinutes(next.time) - toMinutes(stop.time)) : 90;
     const endTime = toClock(toMinutes(stop.time) + durationMin);
     const destination = getDestination(stop.destinationId);
+    // stop.tip يأتي من الذكاء الاصطناعي مباشرة بلغة الواجهة الحالية أصلاً؛ هذا فقط احتياط
+    // نادر لو أغفله الموديل — يستخدم وصف الكتالوج الثابت بنفس لغة الواجهة.
+    const fallbackDescription =
+      lang === "en" ? destination?.descriptionEn : destination?.description;
     return {
       id: `${stop.destinationId}-${index}-${stop.time.replace(":", "")}`,
       order: index + 1,
@@ -174,7 +181,7 @@ export function buildJourneyFromItinerary(dayStops: AiItineraryStop[]): JourneyS
       placeId: null,
       geocoded: false,
       image: destination?.image ?? "",
-      description: stop.tip || destination?.description || "",
+      description: stop.tip || fallbackDescription || "",
       durationMin,
       distanceKm: null,
       travelMin: null,
@@ -228,19 +235,22 @@ export interface PrayerTimings {
   Isha?: string;
 }
 
-const prayerLabels: Record<string, string> = {
-  Fajr: "الفجر",
-  Dhuhr: "الظهر",
-  Asr: "العصر",
-  Maghrib: "المغرب",
-  Isha: "العشاء",
+const prayerLabels: Record<"ar" | "en", Record<string, string>> = {
+  ar: { Fajr: "الفجر", Dhuhr: "الظهر", Asr: "العصر", Maghrib: "المغرب", Isha: "العشاء" },
+  en: { Fajr: "Fajr", Dhuhr: "Dhuhr", Asr: "Asr", Maghrib: "Maghrib", Isha: "Isha" },
 };
 
 /** أقرب صلاة تقع داخل نافذة النشاط أو بعده بقليل. */
-export function nearestPrayer(stopTime: string, endTime: string, timings?: PrayerTimings) {
+export function nearestPrayer(
+  stopTime: string,
+  endTime: string,
+  timings?: PrayerTimings,
+  lang: "ar" | "en" = "ar",
+) {
   if (!timings) return "";
   const start = toMinutes(stopTime);
   const end = toMinutes(endTime) + 45;
+  const labels = prayerLabels[lang];
   let best: { name: string; time: string; diff: number } | null = null;
   for (const [key, value] of Object.entries(timings)) {
     if (!value) continue;
@@ -248,7 +258,7 @@ export function nearestPrayer(stopTime: string, endTime: string, timings?: Praye
     if (t < start || t > end) continue;
     const diff = t - start;
     if (!best || diff < best.diff)
-      best = { name: prayerLabels[key] ?? key, time: String(value).slice(0, 5), diff };
+      best = { name: labels[key] ?? key, time: String(value).slice(0, 5), diff };
   }
   return best ? `${best.name} ${best.time}` : "";
 }
@@ -259,13 +269,19 @@ export interface WeatherHour {
   rainChance: number;
 }
 
-export function weatherForTime(time: string, hours?: WeatherHour[]) {
+const WEATHER_LABEL: Record<"ar" | "en", { clear: string; rain: string; clouds: string }> = {
+  ar: { clear: "صافٍ", rain: "احتمال مطر", clouds: "غيوم" },
+  en: { clear: "Clear", rain: "Rain likely", clouds: "Cloudy" },
+};
+
+export function weatherForTime(time: string, hours?: WeatherHour[], lang: "ar" | "en" = "ar") {
   if (!hours?.length) return "";
   const target = toMinutes(time);
   const closest = hours.reduce((best, h) =>
     Math.abs(toMinutes(h.hour) - target) < Math.abs(toMinutes(best.hour) - target) ? h : best,
   );
-  const rain =
-    closest.rainChance >= 50 ? " • احتمال مطر" : closest.rainChance >= 25 ? " • غيوم" : "";
-  return `${closest.tempC}° ${rain ? rain.replace(" • ", "") : "صافٍ"}`;
+  const label = WEATHER_LABEL[lang];
+  const condition =
+    closest.rainChance >= 50 ? label.rain : closest.rainChance >= 25 ? label.clouds : label.clear;
+  return `${closest.tempC}° ${condition}`;
 }

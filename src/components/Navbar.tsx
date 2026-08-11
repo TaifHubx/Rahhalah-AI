@@ -32,7 +32,7 @@ export function Navbar() {
           <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
             <Compass className="size-5" aria-hidden />
           </span>
-          <span className="text-lg font-bold text-primary">رحّالة</span>
+          <span className="text-lg font-bold text-primary">{t("nav.brand")}</span>
         </Link>
 
         <ul className="hidden min-w-0 items-center justify-center gap-1 md:flex">
@@ -68,7 +68,13 @@ export function Navbar() {
               <LogOut className="size-5" />
             </Button>
           ) : (
-            <Button asChild variant="ghost" size="icon" aria-label={t("auth.login")} className="min-h-11 min-w-11">
+            <Button
+              asChild
+              variant="ghost"
+              size="icon"
+              aria-label={t("auth.login")}
+              className="min-h-11 min-w-11"
+            >
               <Link to="/auth">
                 <UserRound className="size-5" />
               </Link>

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { useI18n } from "@/lib/i18n";
 import { discoverSimilarDestinations } from "@/lib/ai.functions";
-import { getDestination } from "@/lib/mock-data";
+import { getDestination, localizeDestination } from "@/lib/mock-data";
 
 type Result = Awaited<ReturnType<typeof discoverSimilarDestinations>>;
 
@@ -21,7 +21,7 @@ const MAX_BYTES = 6 * 1024 * 1024;
 
 /** رحّالة AI — رفع صورة لمكان عالمي واقتراح شبيهه السعودي عبر Gemini Vision. */
 export function RahhalahAi() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -57,7 +57,7 @@ export function RahhalahAi() {
     setBusy(true);
     try {
       const data = await discoverSimilarDestinations({
-        data: { imageDataUrl: dataUrl, lang: "ar" },
+        data: { imageDataUrl: dataUrl, lang },
       });
       setResult(data);
     } catch (error) {
@@ -153,7 +153,7 @@ export function RahhalahAi() {
                       {dest && (
                         <img
                           src={dest.image}
-                          alt={dest.name}
+                          alt={localizeDestination(dest, lang, t).name}
                           loading="lazy"
                           width={1024}
                           height={768}

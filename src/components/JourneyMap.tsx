@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/StatusChips";
 import { cn } from "@/lib/utils";
 import { getGoogleMapsMapId, loadGoogleMapsLibrary } from "@/lib/google-maps-client";
+import { useI18n } from "@/lib/i18n";
 import type { JourneyStop } from "@/lib/journey";
 
 /**
@@ -98,6 +99,7 @@ function buildUserElement() {
 }
 
 export function JourneyMap({ stops, focusedPlaceId, onFocusPlace }: Props) {
+  const { t, tf } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markerLibRef = useRef<google.maps.MarkerLibrary | null>(null);
@@ -187,11 +189,7 @@ export function JourneyMap({ stops, focusedPlaceId, onFocusPlace }: Props) {
       .catch((err: unknown) => {
         if (cancelled) return;
         console.error("تعذّر تحميل Google Maps:", err);
-        setLoadError(
-          mapId
-            ? "تعذّر تحميل خرائط Google — تأكّد من صحة المفتاح وتفعيل Maps JavaScript API في مشروعك."
-            : "أضف VITE_GOOGLE_MAPS_API_KEY في .env لتفعيل الخريطة (انظر .env.example)، وأنشئ Map ID من Cloud Console لتفعيل الدبابيس المخصصة.",
-        );
+        setLoadError(mapId ? t("map.loadErrorGeneric") : t("map.loadErrorNoKey"));
       });
 
     const markers = markersRef.current;
@@ -452,7 +450,7 @@ export function JourneyMap({ stops, focusedPlaceId, onFocusPlace }: Props) {
   if (stops.length === 0) {
     return (
       <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-border bg-card text-sm text-muted-foreground">
-        لا توجد محطات لعرضها على الخريطة بعد.
+        {t("map.noStops")}
       </div>
     );
   }
@@ -472,18 +470,18 @@ export function JourneyMap({ stops, focusedPlaceId, onFocusPlace }: Props) {
         ref={containerRef}
         className="h-[300px] w-full sm:h-[380px]"
         role="application"
-        aria-label="خريطة محطات الرحلة"
+        aria-label={t("map.ariaLabel")}
       />
 
       {(!mapReady || waitingForGeocoding) && (
         <div className="absolute inset-0 z-[900] flex items-center justify-center gap-2 bg-sand text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" aria-hidden />
-          {mapReady ? "جاري تحديد مواقع المحطات..." : "جاري تحميل الخريطة..."}
+          {mapReady ? t("map.locatingStops") : t("map.loadingMap")}
         </div>
       )}
 
       <p className="pointer-events-none absolute start-3 top-3 z-[400] rounded-full bg-card/85 px-3 py-1 text-xs text-muted-foreground">
-        {stops.length} محطات • اضغط أي دبوس لعرض التفاصيل
+        {tf("map.stopsHint", { n: stops.length })}
       </p>
 
       {/* بطاقة معاينة عائمة بدل InfoWindow الافتراضية */}
@@ -510,7 +508,7 @@ export function JourneyMap({ stops, focusedPlaceId, onFocusPlace }: Props) {
             <h3 className="truncate font-bold">{peek?.title}</h3>
             <button
               type="button"
-              aria-label="إغلاق البطاقة"
+              aria-label={t("map.closeCard")}
               onClick={() => setPeekId(null)}
               className="rounded-md p-1 text-muted-foreground hover:bg-secondary"
             >
@@ -519,7 +517,7 @@ export function JourneyMap({ stops, focusedPlaceId, onFocusPlace }: Props) {
           </div>
           <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="size-3.5 shrink-0" aria-hidden />
-            الوصول {peek?.time}
+            {t("map.arrival")} {peek?.time}
             <span aria-hidden>•</span>
             <span className="truncate">{peek?.place}</span>
           </p>
@@ -527,7 +525,7 @@ export function JourneyMap({ stops, focusedPlaceId, onFocusPlace }: Props) {
             {peek?.description}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Chip tone="gold">المحطة {peek?.order}</Chip>
+            <Chip tone="gold">{tf("map.stopLabel", { n: peek?.order ?? "" })}</Chip>
             {peek && (
               <Button
                 size="sm"
@@ -547,7 +545,7 @@ export function JourneyMap({ stops, focusedPlaceId, onFocusPlace }: Props) {
                 }}
               >
                 <MapPin className="size-3.5" aria-hidden />
-                عرض الموقع
+                {t("map.viewLocation")}
               </Button>
             )}
           </div>

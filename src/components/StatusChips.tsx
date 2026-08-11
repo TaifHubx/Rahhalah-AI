@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
 import type { ReactNode } from "react";
 
 export function Chip({
@@ -31,7 +32,10 @@ export function Chip({
 }
 
 export function OpenStatus({ isOpen }: { isOpen: boolean }) {
+  const { t } = useI18n();
   return (
-    <Chip tone={isOpen ? "success" : "neutral"}>{isOpen ? "🟢 مفتوح الآن" : "⏸️ مغلق حالياً"}</Chip>
+    <Chip tone={isOpen ? "success" : "neutral"}>
+      {isOpen ? t("card.openNow") : t("card.closedNow")}
+    </Chip>
   );
 }

@@ -3,8 +3,9 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import { DestinationCard } from "@/components/DestinationCard";
-import { destinations } from "@/lib/mock-data";
+import { destinations, localizeDestination } from "@/lib/mock-data";
 import { appStore, useAppStore } from "@/lib/app-store";
+import { useI18n, type TranslationKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/explore")({
@@ -16,24 +17,30 @@ export const Route = createFileRoute("/explore")({
         content: "تصفّح وجهات تراثية وطبيعية وترفيهية في السعودية مع فلاتر للعائلات وأصحاب الهمم.",
       },
       { property: "og:title", content: "استكشف الوجهات السعودية | رحّالة" },
-      { property: "og:description", content: "وجهات مقترحة تناسب تفضيلاتك مع حالة الفتح والازدحام." },
+      {
+        property: "og:description",
+        content: "وجهات مقترحة تناسب تفضيلاتك مع حالة الفتح والازدحام.",
+      },
     ],
   }),
   component: ExplorePage,
 });
 
+// القيم الداخلية (المفاتيح) تبقى عربية ثابتة لمطابقة d.category في mock-data — فقط تسمية
+// العرض (label) هي التي تُترجم عبر i18n. انظر ai.functions.ts/mock-data.ts لنفس النمط.
 const filters = [
-  "الكل",
-  "تراثي",
-  "طبيعي",
-  "ترفيهي",
-  "عائلي",
-  "أصحاب الهمم",
-  "مفتوح الآن",
+  { value: "الكل", label: "explore.filter.all" satisfies TranslationKey },
+  { value: "تراثي", label: "explore.filter.heritage" satisfies TranslationKey },
+  { value: "طبيعي", label: "explore.filter.nature" satisfies TranslationKey },
+  { value: "ترفيهي", label: "explore.filter.entertainment" satisfies TranslationKey },
+  { value: "عائلي", label: "explore.filter.family" satisfies TranslationKey },
+  { value: "أصحاب الهمم", label: "explore.filter.accessible" satisfies TranslationKey },
+  { value: "مفتوح الآن", label: "explore.filter.openNow" satisfies TranslationKey },
 ] as const;
 
 function ExplorePage() {
-  const [active, setActive] = useState<(typeof filters)[number]>("الكل");
+  const { t, lang } = useI18n();
+  const [active, setActive] = useState<(typeof filters)[number]["value"]>("الكل");
   const { tripIds } = useAppStore();
 
   const results = useMemo(
@@ -50,36 +57,31 @@ function ExplorePage() {
 
   return (
     <div>
-      <PageHeader
-        title="وجهات مقترحة لك"
-        subtitle="اخترنا هذه الوجهات بناءً على تفضيلاتك. استخدم الفلاتر لتضييق النتائج."
-      />
+      <PageHeader title={t("explore.title")} subtitle={t("explore.subtitle")} />
 
       <div className="mx-auto max-w-6xl px-4 py-8">
-        <div
-          role="group"
-          aria-label="فلاتر الوجهات"
-          className="flex flex-wrap gap-2"
-        >
+        <div role="group" aria-label={t("explore.filtersLabel")} className="flex flex-wrap gap-2">
           {filters.map((f) => (
             <button
-              key={f}
+              key={f.value}
               type="button"
-              aria-pressed={active === f}
-              onClick={() => setActive(f)}
+              aria-pressed={active === f.value}
+              onClick={() => setActive(f.value)}
               className={cn(
                 "min-h-11 rounded-full border px-4 text-sm font-medium transition-colors",
-                active === f
+                active === f.value
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-card text-muted-foreground hover:bg-secondary",
               )}
             >
-              {f}
+              {t(f.label)}
             </button>
           ))}
         </div>
 
-        <p className="mt-4 text-sm text-muted-foreground">{results.length} وجهة مطابقة</p>
+        <p className="mt-4 text-sm text-muted-foreground">
+          {results.length} {t("explore.resultsSuffix")}
+        </p>
 
         <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {results.map((d) => (
@@ -90,7 +92,8 @@ function ExplorePage() {
               added={tripIds.includes(d.id)}
               onAdd={(id) => {
                 appStore.addToTrip(id);
-                toast.success(`تمت إضافة ${d.name} إلى رحلتك`);
+                const name = localizeDestination(d, lang, t).name;
+                toast.success(t("explore.addedToast").replace("{name}", name));
               }}
             />
           ))}

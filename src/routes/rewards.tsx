@@ -3,8 +3,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import { Chip } from "@/components/StatusChips";
-import { rewards } from "@/lib/mock-data";
+import { localizeReward, rewards } from "@/lib/mock-data";
 import { appStore, useAppStore } from "@/lib/app-store";
+import { useI18n } from "@/lib/i18n";
 
 export const Route = createFileRoute("/rewards")({
   head: () => ({
@@ -22,21 +23,25 @@ export const Route = createFileRoute("/rewards")({
 });
 
 function RewardsPage() {
+  const { t, lang } = useI18n();
   const { points } = useAppStore();
 
   return (
     <div>
-      <PageHeader title="مكافآتي" subtitle="اجمع النقاط من التحديات واستبدلها بمزايا من شركائنا." />
+      <PageHeader title={t("rewards.title")} subtitle={t("rewards.subtitle")} />
 
       <div className="mx-auto max-w-4xl px-4 py-8">
         <section className="rounded-2xl bg-primary p-6 text-primary-foreground">
-          <p className="text-sm text-primary-foreground/80">رصيدك الحالي</p>
-          <p className="mt-1 text-3xl font-bold">{points} نقطة ⭐</p>
+          <p className="text-sm text-primary-foreground/80">{t("rewards.currentBalance")}</p>
+          <p className="mt-1 text-3xl font-bold">
+            {points} {t("rewards.pointsSuffix")}
+          </p>
         </section>
 
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
           {rewards.map((r) => {
             const affordable = points >= r.points;
+            const rText = localizeReward(r, lang);
             return (
               <article
                 key={r.id}
@@ -45,11 +50,13 @@ function RewardsPage() {
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
                   <div className="min-w-0">
                     <h3 className="truncate font-bold">
-                      {r.emoji} {r.title}
+                      {r.emoji} {rText.title}
                     </h3>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{r.partner}</p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{rText.partner}</p>
                   </div>
-                  <Chip tone="gold">{r.points} نقطة</Chip>
+                  <Chip tone="gold">
+                    {r.points} {t("rewards.pointsUnit")}
+                  </Chip>
                 </div>
 
                 <Button
@@ -58,10 +65,12 @@ function RewardsPage() {
                   disabled={!affordable}
                   onClick={() => {
                     appStore.redeem(r.points);
-                    toast.success(`تم استبدال «${r.title}» بنجاح`);
+                    toast.success(
+                      `${t("rewards.redeemedPrefix")} «${rText.title}» ${t("rewards.redeemedSuffix")}`.trim(),
+                    );
                   }}
                 >
-                  {affordable ? "استبدال النقاط" : "نقاط غير كافية"}
+                  {affordable ? t("rewards.redeem") : t("rewards.notEnough")}
                 </Button>
               </article>
             );
